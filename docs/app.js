@@ -2,6 +2,8 @@ let rtpChartInstance = null;
 let bucketChartInstance = null;
 let balanceChartInstance = null;
 let currentSim = null; // Store for visual spin
+let lastResults = null; // For CSV export
+let autoSpinInterval = null; // For Auto-Spin
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- TABS LOGIC ---
@@ -18,27 +20,40 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // --- REEL EDITOR LOGIC ---
+    // --- REEL EDITOR & PRESETS LOGIC ---
     const editorGrid = document.getElementById('editorGrid');
-    const defaultWeights = {
-        "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3
+    const presets = {
+        low: { "W": 6.0, "H1": 6, "H2": 7, "M1": 8, "M2": 8, "L1": 8, "L2": 8, "SC": 3, "CO": 4 },
+        med: { "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
+        high: { "W": 2.5, "H1": 2, "H2": 3, "M1": 5, "M2": 6, "L1": 15, "L2": 20, "SC": 1.5, "CO": 2 }
     };
     
-    for (let sym in defaultWeights) {
-        let card = document.createElement('div');
-        card.className = 'editor-card';
-        card.innerHTML = `
-            <h4>${sym}</h4>
-            <input type="number" id="weight_${sym}" value="${defaultWeights[sym]}" step="0.1" min="0">
-        `;
-        editorGrid.appendChild(card);
+    function renderEditor(weights) {
+        editorGrid.innerHTML = '';
+        for (let sym in weights) {
+            let card = document.createElement('div');
+            card.className = 'editor-card';
+            card.innerHTML = `
+                <h4>${sym}</h4>
+                <input type="number" id="weight_${sym}" value="${weights[sym]}" step="0.1" min="0">
+            `;
+            editorGrid.appendChild(card);
+        }
     }
+    
+    // Init with medium
+    renderEditor(presets.med);
+
+    document.getElementById('presetLow').addEventListener('click', () => renderEditor(presets.low));
+    document.getElementById('presetMed').addEventListener('click', () => renderEditor(presets.med));
+    document.getElementById('presetHigh').addEventListener('click', () => renderEditor(presets.high));
     
     function getCustomWeights() {
         let cw = {};
-        for (let sym in defaultWeights) {
-            let val = parseFloat(document.getElementById(`weight_${sym}`).value);
-            cw[sym] = isNaN(val) ? defaultWeights[sym] : val;
+        for (let sym in presets.med) {
+            let el = document.getElementById(`weight_${sym}`);
+            let val = el ? parseFloat(el.value) : presets.med[sym];
+            cw[sym] = isNaN(val) ? presets.med[sym] : val;
         }
         return cw;
     }
@@ -50,6 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressContainer = document.getElementById('progressContainer');
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
 
     runBtn.addEventListener('click', async () => {
         const numSpins = parseInt(document.getElementById('numSpins').value) || 1000000;
@@ -61,11 +77,12 @@ document.addEventListener('DOMContentLoaded', () => {
         progressContainer.style.display = 'block';
         progressBar.style.width = '0%';
         progressText.innerText = '0%';
+        exportCsvBtn.style.display = 'none';
 
         currentSim = new Simulation();
         currentSim.setupGame(getCustomWeights(), coinProb);
 
-        const results = await currentSim.runSimulation(numSpins, (percent) => {
+        lastResults = await currentSim.runSimulation(numSpins, (percent) => {
             progressBar.style.width = `${percent}%`;
             progressText.innerText = `${percent.toFixed(1)}%`;
         });
@@ -74,17 +91,47 @@ document.addEventListener('DOMContentLoaded', () => {
         btnText.style.display = 'block';
         btnLoader.style.display = 'none';
         progressContainer.style.display = 'none';
+        exportCsvBtn.style.display = 'block';
 
-        updateMetrics(results);
-        renderCharts(results);
+        updateMetrics(lastResults);
+        renderCharts(lastResults);
+    });
+
+    // --- CSV EXPORT LOGIC ---
+    exportCsvBtn.addEventListener('click', () => {
+        if (!lastResults) return;
+        let csvContent = "data:text/csv;charset=utf-8,Metric,Value\n";
+        csvContent += `Total Spins,${lastResults.num_spins}\n`;
+        csvContent += `Total RTP,${(lastResults.total_rtp*100).toFixed(4)}%\n`;
+        csvContent += `Base RTP,${(lastResults.base_rtp*100).toFixed(4)}%\n`;
+        csvContent += `Bonus RTP,${(lastResults.bonus_rtp*100).toFixed(4)}%\n`;
+        csvContent += `Hold & Spin RTP,${(lastResults.hs_rtp*100).toFixed(4)}%\n`;
+        csvContent += `Hit Rate,${(lastResults.hit_rate*100).toFixed(4)}%\n`;
+        csvContent += `Volatility Index,${lastResults.volatility.toFixed(4)}\n`;
+        csvContent += `Bonus Frequency,1 in ${lastResults.bonus_freq.toFixed(1)}\n`;
+        csvContent += `Hold & Spin Frequency,1 in ${lastResults.hs_freq.toFixed(1)}\n`;
+        csvContent += `Grand Jackpot Frequency,1 in ${lastResults.grand_freq.toFixed(1)}\n`;
+        
+        for(let b in lastResults.buckets) {
+            csvContent += `Bucket ${b},${lastResults.buckets[b].toFixed(4)}%\n`;
+        }
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "slot_simulation_results.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     });
     
     // --- VISUAL SPIN LOGIC ---
     const spinOnceBtn = document.getElementById('spinOnceBtn');
+    const autoSpinBtn = document.getElementById('autoSpinBtn');
     const slotCells = document.querySelectorAll('.slot-cell');
     const winDisplay = document.getElementById('winDisplay');
     
-    spinOnceBtn.addEventListener('click', () => {
+    function doVisualSpin() {
         if (!currentSim) {
             currentSim = new Simulation();
             currentSim.setupGame(getCustomWeights(), 0.05);
@@ -92,7 +139,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let grid = currentSim.engine.spin();
         
-        // Flatten grid to row-major for the DOM cells
+        // Remove previous animations
+        slotCells.forEach(cell => cell.classList.remove('win-pulse'));
+        
         let flatIndex = 0;
         for (let r = 0; r < 3; r++) {
             for (let c = 0; c < 5; c++) {
@@ -108,16 +157,64 @@ document.addEventListener('DOMContentLoaded', () => {
         let hs_res = currentSim.run_hs(grid);
         
         let total = base_payout + scatters.payout;
-        let text = `BASE WIN: ${total.toFixed(2)}`;
+        let text = `WIN: ${total.toFixed(2)}`;
         
+        let isBigWin = false;
+
         if (scatters.count >= 3) {
-            text += ` | FREE SPINS TRIGGERED!`;
+            text += ` | FREE SPINS!`;
+            isBigWin = true;
+            // Pulse scatters
+            slotCells.forEach(cell => { if(cell.innerText === 'SC') cell.classList.add('win-pulse'); });
         }
         if (hs_res.triggered) {
             text += ` | HOLD & SPIN WIN: ${hs_res.payout.toFixed(2)}`;
+            isBigWin = true;
+            // Pulse coins
+            slotCells.forEach(cell => { if(cell.innerText === 'CO') cell.classList.add('win-pulse'); });
+        }
+        
+        if (hs_res.grand) {
+            text = `💰 GRAND JACKPOT! 💰`;
+            slotCells.forEach(cell => cell.classList.add('win-pulse')); // Pulse everything
+        } else if (base_payout > 5.0) {
+            isBigWin = true;
+            // Pulse Wilds on a big base win
+            slotCells.forEach(cell => { if(cell.innerText === 'W') cell.classList.add('win-pulse'); });
+        }
+        
+        if (isBigWin || base_payout > 0) {
+            winDisplay.style.color = 'var(--success-color)';
+        } else {
+            winDisplay.style.color = 'var(--text-secondary)';
+            text = "NO WIN";
         }
         
         winDisplay.innerText = text;
+    }
+
+    spinOnceBtn.addEventListener('click', () => {
+        if(autoSpinInterval) {
+            clearInterval(autoSpinInterval);
+            autoSpinInterval = null;
+            autoSpinBtn.classList.remove('active');
+            autoSpinBtn.innerText = "AUTO";
+        }
+        doVisualSpin();
+    });
+
+    autoSpinBtn.addEventListener('click', () => {
+        if (autoSpinInterval) {
+            clearInterval(autoSpinInterval);
+            autoSpinInterval = null;
+            autoSpinBtn.classList.remove('active');
+            autoSpinBtn.innerText = "AUTO";
+        } else {
+            autoSpinInterval = setInterval(doVisualSpin, 1200); // 1.2 seconds per spin
+            autoSpinBtn.classList.add('active');
+            autoSpinBtn.innerText = "STOP AUTO";
+            doVisualSpin(); // do first spin immediately
+        }
     });
 });
 
@@ -139,7 +236,6 @@ function renderCharts(results) {
     Chart.defaults.color = '#94a3b8';
     Chart.defaults.font.family = "'Space Grotesk', sans-serif";
 
-    // 1. RTP Doughnut
     if (rtpChartInstance) rtpChartInstance.destroy();
     rtpChartInstance = new Chart(document.getElementById('rtpChart').getContext('2d'), {
         type: 'doughnut',
@@ -160,7 +256,6 @@ function renderCharts(results) {
         }
     });
 
-    // 2. Win Buckets Bar Chart
     if (bucketChartInstance) bucketChartInstance.destroy();
     bucketChartInstance = new Chart(document.getElementById('bucketChart').getContext('2d'), {
         type: 'bar',
@@ -183,7 +278,6 @@ function renderCharts(results) {
         }
     });
 
-    // 3. Balance Random Walk Line Chart
     if (balanceChartInstance) balanceChartInstance.destroy();
     let labels = Array.from({length: results.balance_history.length}, (_, i) => i * (results.num_spins / results.balance_history.length));
     balanceChartInstance = new Chart(document.getElementById('balanceChart').getContext('2d'), {
