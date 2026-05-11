@@ -61,6 +61,10 @@
                         <div class="progress-bar" id="progressBar"></div>
                         <span class="progress-text" id="progressText">0%</span>
                     </div>
+
+                    <button id="exportCsvBtn" class="btn-secondary mt-1" style="display: none;">
+                        ⬇️ EXPORT RESULTS TO CSV
+                    </button>
                 </section>
 
                 <!-- Results Panel -->
@@ -111,9 +115,16 @@
 
         <!-- Reel Editor Tab -->
         <div id="reel-editor" class="tab-content">
-            <section class="glass-panel">
+            <section class="glass-panel text-center">
                 <h2>Reel Strip Base Weights</h2>
-                <p>Modify the base symbol weights. These are applied to Reel 1, and procedurally scaled across Reels 2-5.</p>
+                <p>Modify the base symbol weights or quickly load a volatility preset.</p>
+                
+                <div class="preset-buttons">
+                    <button class="btn-preset" id="presetLow">Low Volatility</button>
+                    <button class="btn-preset" id="presetMed">Medium Volatility</button>
+                    <button class="btn-preset" id="presetHigh">High Volatility</button>
+                </div>
+
                 <div class="editor-grid" id="editorGrid">
                     <!-- Populated by JS -->
                 </div>
@@ -135,10 +146,12 @@
                     </div>
                 </div>
                 
-                <div class="spin-controls">
-                    <button id="spinOnceBtn" class="btn-primary" style="max-width: 300px; margin: 0 auto;">SPIN ONCE</button>
-                    <div class="win-display" id="winDisplay">WIN: 0.00</div>
+                <div class="spin-controls" style="display: flex; gap: 1rem; justify-content: center; max-width: 400px; margin: 0 auto;">
+                    <button id="spinOnceBtn" class="btn-primary" style="flex: 2;">SPIN ONCE</button>
+                    <button id="autoSpinBtn" class="btn-secondary" style="flex: 1;">AUTO</button>
                 </div>
+                
+                <div class="win-display" id="winDisplay">WIN: 0.00</div>
             </section>
         </div>
     </main>
