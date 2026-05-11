@@ -417,7 +417,8 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSim.setupGame(getCustomWeights(), 0.05);
         }
         
-        let grid = currentSim.engine.spin();
+        let cascade_res = currentSim.run_cascade_spin();
+        let grid = cascade_res.final_grid;
         
         slotCells.forEach(cell => cell.classList.remove('win-pulse'));
         
@@ -431,39 +432,35 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        let base_payout = currentSim.evaluator.evaluate(grid);
-        let scatters = currentSim.evaluator.evaluate_scatters(grid);
-        let hs_res = currentSim.run_hs(grid);
-        
-        let total = base_payout + scatters.payout;
+        let total = cascade_res.payout + cascade_res.scatter_payout;
         let text = `WIN: ${total.toFixed(2)}`;
         
         let isBigWin = false;
 
-        if (scatters.count >= 3) {
+        if (cascade_res.scatters >= 3) {
             text += ` | FREE SPINS!`;
             isBigWin = true;
             slotCells.forEach(cell => { if(cell.innerText === 'SC') cell.classList.add('win-pulse'); });
         }
-        if (hs_res.triggered) {
-            text += ` | HOLD & SPIN WIN: ${hs_res.payout.toFixed(2)}`;
+        if (cascade_res.hs_triggered) {
+            text += ` | HOLD & SPIN: ${cascade_res.hs_payout.toFixed(2)}`;
             isBigWin = true;
             slotCells.forEach(cell => { if(cell.innerText === 'CO') cell.classList.add('win-pulse'); });
         }
         
-        if (hs_res.grand) {
-            text = `💰 GRAND JACKPOT! 💰`;
+        if (cascade_res.hs_grand) {
+            text = `💰 PROGRESSIVE JACKPOT HIT! 💰`;
             slotCells.forEach(cell => cell.classList.add('win-pulse')); 
             playJackpotSound();
-        } else if (isBigWin || base_payout > 5.0) {
+        } else if (isBigWin || total > 5.0) {
             isBigWin = true;
             slotCells.forEach(cell => { if(cell.innerText === 'W') cell.classList.add('win-pulse'); });
             playWinSound();
-        } else if (base_payout > 0) {
-            playTone(400, 'sine', 0.1, 0.05); // Small win tick
+        } else if (total > 0) {
+            playTone(400, 'sine', 0.1, 0.05);
         }
         
-        if (isBigWin || base_payout > 0) {
+        if (isBigWin || total > 0) {
             winDisplay.style.color = 'var(--success-color)';
             winDisplay.style.textShadow = '0 0 20px rgba(0, 230, 118, 0.6)';
         } else {
@@ -512,6 +509,11 @@ function updateMetrics(results) {
     document.getElementById('mBonusFreq').innerText = results.bonus_freq > 0 ? `1 in ${Math.round(results.bonus_freq)}` : 'None';
     document.getElementById('mHsFreq').innerText = results.hs_freq > 0 ? `1 in ${Math.round(results.hs_freq)}` : 'None';
     document.getElementById('mGrandFreq').innerText = results.grand_freq > 0 ? `1 in ${Math.round(results.grand_freq)}` : 'None';
+    
+    let mProg = document.getElementById('mProg');
+    if (mProg && results.avg_jackpot) {
+        mProg.innerText = `$${Math.round(results.avg_jackpot).toLocaleString()}`;
+    }
 }
 
 function renderCharts(results) {
