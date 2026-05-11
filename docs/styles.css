@@ -397,10 +397,7 @@ small { display: block; margin-top: 0.5rem; color: #64748b; font-size: 0.8rem; }
     text-shadow: 0 0 10px white;
 }
 
-/* Audio Toggle */
-.audio-toggle-container {
-    position: absolute; top: 20px; right: 20px; z-index: 100;
-}
+/* Top Controls Bar */
 .btn-cyber-small {
     background: rgba(0,0,0,0.5); color: var(--text-primary); border: 1px solid rgba(255,255,255,0.2);
     padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; transition: all 0.2s;
