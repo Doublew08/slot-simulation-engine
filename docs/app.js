@@ -1,6 +1,7 @@
 let rtpChartInstance = null;
 let bucketChartInstance = null;
 let balanceChartInstance = null;
+let sessionHistChartInstance = null;
 let currentSim = null; 
 let lastResults = null; 
 let autoSpinInterval = null; 
@@ -170,6 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressBar = document.getElementById('progressBar');
     const progressText = document.getElementById('progressText');
     const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
 
     runBtn.addEventListener('click', async () => {
         const numSpins = parseInt(document.getElementById('numSpins').value) || 1000000;
@@ -182,6 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         progressBar.style.width = '0%';
         progressText.innerText = '0%';
         exportCsvBtn.style.display = 'none';
+        exportJsonBtn.style.display = 'none';
 
         currentSim = new Simulation();
         currentSim.setupGame(getCustomWeights(), coinProb);
@@ -197,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnLoader.style.display = 'none';
         progressContainer.style.display = 'none';
         exportCsvBtn.style.display = 'block';
+        exportJsonBtn.style.display = 'block';
 
         updateMetrics(lastResults);
         renderCharts(lastResults);
@@ -226,7 +230,176 @@ document.addEventListener('DOMContentLoaded', () => {
         link.click();
         document.body.removeChild(link);
     });
+
+    // --- JSON PAR SHEET EXPORT LOGIC ---
+    exportJsonBtn.addEventListener('click', () => {
+        if (!currentSim) return;
+        
+        let parData = {
+            "math_model": "SlotSimulationEngine_V2",
+            "date_generated": new Date().toISOString(),
+            "target_rtp": lastResults ? (lastResults.total_rtp*100).toFixed(4) + "%" : "N/A",
+            "volatility": lastResults ? lastResults.volatility.toFixed(4) : "N/A",
+            "base_weights": getCustomWeights(),
+            "reel_strips": currentSim.engine.reels.map(r => r.pool),
+            "paytable": {}
+        };
+        
+        for (let [sym, def] of currentSim.paytable.entries()) {
+            parData.paytable[sym] = {
+                "payouts": def.payouts,
+                "is_wild": def.is_wild,
+                "is_scatter": def.is_scatter,
+                "is_coin": def.is_coin
+            };
+        }
+
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(parData, null, 2));
+        const link = document.createElement("a");
+        link.setAttribute("href", dataStr);
+        link.setAttribute("download", "math_config.json");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    });
     
+    // --- SESSION SIMULATOR LOGIC ---
+    const runSessBtn = document.getElementById('runSessBtn');
+    if (runSessBtn) {
+        const sessBtnText = document.getElementById('sessBtnText');
+        const sessBtnLoader = document.getElementById('sessBtnLoader');
+        const sessProgressContainer = document.getElementById('sessProgressContainer');
+        const sessProgressBar = document.getElementById('sessProgressBar');
+        const sessProgressText = document.getElementById('sessProgressText');
+
+        runSessBtn.addEventListener('click', async () => {
+            const bankroll = parseFloat(document.getElementById('sessBankroll').value) || 100;
+            const betSize = parseFloat(document.getElementById('sessBet').value) || 1;
+            const spinsPerSess = parseInt(document.getElementById('sessSpins').value) || 200;
+            const numSessions = parseInt(document.getElementById('sessCount').value) || 5000;
+
+            runSessBtn.disabled = true;
+            sessBtnText.style.display = 'none';
+            sessBtnLoader.style.display = 'block';
+            sessProgressContainer.style.display = 'block';
+            sessProgressBar.style.width = '0%';
+            sessProgressText.innerText = '0%';
+
+            if (!currentSim) {
+                currentSim = new Simulation();
+                currentSim.setupGame(getCustomWeights(), parseFloat(document.getElementById('coinProb').value) || 0.05);
+            }
+
+            let endBalances = new Float32Array(numSessions);
+            let bankruptCount = 0;
+            let profitCount = 0;
+            let totalEndBal = 0;
+
+            const chunkSize = 200;
+            let currentSession = 0;
+
+            function runChunk() {
+                return new Promise(resolve => {
+                    let end = Math.min(currentSession + chunkSize, numSessions);
+                    for (let s = currentSession; s < end; s++) {
+                        let bal = bankroll;
+                        for (let sp = 0; sp < spinsPerSess; sp++) {
+                            if (bal < betSize) break; // Bankrupt
+                            bal -= betSize;
+                            
+                            let grid = currentSim.engine.spin();
+                            let base_payout = currentSim.evaluator.evaluate(grid);
+                            let scatters = currentSim.evaluator.evaluate_scatters(grid);
+                            let hs_res = currentSim.run_hs(grid);
+                            
+                            let totalWin = (base_payout + scatters.payout + hs_res.payout) * betSize;
+                            bal += totalWin;
+                        }
+                        
+                        endBalances[s] = bal;
+                        totalEndBal += bal;
+                        if (bal < betSize) bankruptCount++;
+                        if (bal > bankroll) profitCount++;
+                    }
+                    
+                    currentSession = end;
+                    let pct = (currentSession / numSessions) * 100;
+                    sessProgressBar.style.width = `${pct}%`;
+                    sessProgressText.innerText = `${pct.toFixed(1)}%`;
+                    
+                    if (currentSession < numSessions) {
+                        setTimeout(() => resolve(runChunk()), 0);
+                    } else {
+                        resolve();
+                    }
+                });
+            }
+
+            await runChunk();
+
+            let riskOfRuin = (bankruptCount / numSessions) * 100;
+            let avgEnd = totalEndBal / numSessions;
+            let profitPct = (profitCount / numSessions) * 100;
+
+            document.getElementById('mRuin').innerText = riskOfRuin.toFixed(2) + '%';
+            document.getElementById('mAvgEnd').innerText = '$' + avgEnd.toFixed(2);
+            document.getElementById('mProfit').innerText = profitPct.toFixed(2) + '%';
+
+            let maxBal = 0;
+            for(let i=0; i<numSessions; i++) {
+                if(endBalances[i] > maxBal) maxBal = endBalances[i];
+            }
+            
+            let numBins = 20;
+            if (maxBal === 0) maxBal = 1; // handle edge case
+            let binSize = maxBal / numBins;
+            let bins = new Array(numBins).fill(0);
+            let binLabels = [];
+            
+            for(let i=0; i<numBins; i++) {
+                binLabels.push(`$${(i*binSize).toFixed(0)}-$${((i+1)*binSize).toFixed(0)}`);
+            }
+
+            for(let i=0; i<numSessions; i++) {
+                let binIdx = Math.min(Math.floor(endBalances[i] / binSize), numBins - 1);
+                bins[binIdx]++;
+            }
+
+            if (sessionHistChartInstance) sessionHistChartInstance.destroy();
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.font.family = "'Space Grotesk', sans-serif";
+            
+            sessionHistChartInstance = new Chart(document.getElementById('sessionHistChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: binLabels,
+                    datasets: [{
+                        label: 'Number of Players',
+                        data: bins,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Session End Balance Distribution', font: { size: 16 } }
+                    },
+                    scales: {
+                        x: { ticks: { maxRotation: 45, minRotation: 45 } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' } }
+                    }
+                }
+            });
+
+            runSessBtn.disabled = false;
+            sessBtnText.style.display = 'block';
+            sessBtnLoader.style.display = 'none';
+            sessProgressContainer.style.display = 'none';
+        });
+    }
+
     // --- VISUAL SPIN LOGIC ---
     const spinOnceBtn = document.getElementById('spinOnceBtn');
     const autoSpinBtn = document.getElementById('autoSpinBtn');

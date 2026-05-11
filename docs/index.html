@@ -36,6 +36,7 @@
             <button class="tab-btn active" data-tab="dashboard">Math Dashboard</button>
             <button class="tab-btn" data-tab="reel-editor">Reel Editor</button>
             <button class="tab-btn" data-tab="visual-spin">Visual Spinner</button>
+            <button class="tab-btn" data-tab="session-sim">Session Sim</button>
             <button class="tab-btn" data-tab="documentation">Documentation</button>
             <button class="tab-btn" data-tab="about">About</button>
         </div>
@@ -70,6 +71,9 @@
 
                     <button id="exportCsvBtn" class="btn-secondary mt-1" style="display: none;">
                         ⬇️ EXPORT RESULTS TO CSV
+                    </button>
+                    <button id="exportJsonBtn" class="btn-secondary mt-1" style="display: none;">
+                        ⚙️ EXPORT JSON PAR SHEET
                     </button>
                 </section>
 
@@ -233,6 +237,73 @@
                     </div>
                 </div>
             </section>
+        </div>
+
+        <!-- Session Simulator Tab -->
+        <div id="session-sim" class="tab-content">
+            <div class="dashboard">
+                <!-- Controls -->
+                <section class="glass-panel controls-panel">
+                    <h2>Session Parameters</h2>
+                    
+                    <div class="form-group">
+                        <label for="sessBankroll">Starting Bankroll ($)</label>
+                        <input type="number" id="sessBankroll" value="100" min="10" step="10">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="sessBet">Bet Size ($)</label>
+                        <input type="number" id="sessBet" value="1" min="0.10" step="0.10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sessSpins">Spins Per Session</label>
+                        <input type="number" id="sessSpins" value="200" min="10" step="10">
+                        <small>Simulates e.g., 30 minutes of play</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sessCount">Number of Sessions</label>
+                        <input type="number" id="sessCount" value="5000" min="1000" step="1000">
+                        <small>Total virtual players to simulate</small>
+                    </div>
+
+                    <button id="runSessBtn" class="btn-primary">
+                        <span class="btn-text" id="sessBtnText">RUN SESSION SIM</span>
+                        <span class="loader" id="sessBtnLoader" style="display: none;"></span>
+                    </button>
+                    
+                    <div class="progress-container" id="sessProgressContainer" style="display: none;">
+                        <div class="progress-bar" id="sessProgressBar"></div>
+                        <span class="progress-text" id="sessProgressText">0%</span>
+                    </div>
+                </section>
+
+                <!-- Results -->
+                <section class="glass-panel results-panel">
+                    <h2>Session Risk Analysis</h2>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h3>Risk of Ruin</h3>
+                            <p class="metric-value highlight" id="mRuin" style="color: #ef4444;">--%</p>
+                            <small>Players who went bankrupt</small>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Average End Balance</h3>
+                            <p class="metric-value" id="mAvgEnd">$--</p>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Players in Profit</h3>
+                            <p class="metric-value highlight" id="mProfit">--%</p>
+                        </div>
+                    </div>
+
+                    <div class="chart-wrapper-large" style="height: 350px;">
+                        <canvas id="sessionHistChart"></canvas>
+                    </div>
+                </section>
+            </div>
         </div>
     </main>
 
