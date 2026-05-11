@@ -37,6 +37,7 @@
             <button class="tab-btn" data-tab="reel-editor">REEL_CONFIG</button>
             <button class="tab-btn" data-tab="visual-spin">VISUALIZER</button>
             <button class="tab-btn" data-tab="documentation">DOCS_PAYTABLE</button>
+            <button class="tab-btn" data-tab="about">SYS_ABOUT</button>
         </div>
 
         <!-- Dashboard Tab -->
@@ -191,6 +192,43 @@
                                 <!-- Populated by JS -->
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- About Tab -->
+        <div id="about" class="tab-content">
+            <section class="glass-panel cyber-panel">
+                <h2 class="text-center">// SYSTEM_DOCUMENTATION</h2>
+                <p class="text-center cyber-subtext">HOW THE SLOT ENGINE WORKS</p>
+                
+                <div class="cyber-card p-4" style="margin-top: 2rem; margin-bottom: 2rem;">
+                    <h3 style="color: var(--primary-color); margin-bottom: 1rem;">[ WHAT IS THIS? ]</h3>
+                    <p style="margin-bottom: 1rem; line-height: 1.6;">
+                        This is a <strong>Monte Carlo Simulation Engine</strong> designed to test and balance slot machine mathematics. 
+                        In the casino gaming industry, math models must be rigorously tested to ensure they hit target payouts and remain profitable for the house while being engaging for the player. 
+                        This engine rapidly simulates millions of mathematical permutations to converge on theoretical probabilities.
+                    </p>
+                </div>
+
+                <div class="dashboard" style="grid-template-columns: 1fr 1fr;">
+                    <div class="cyber-card p-4">
+                        <h3 style="color: var(--secondary-color); margin-bottom: 1rem;">[ KEY METRICS ]</h3>
+                        <ul style="list-style: none; line-height: 1.8;">
+                            <li><strong style="color: var(--primary-color);">RTP (Return to Player):</strong> The theoretical percentage of wagered money paid back over millions of spins. Example: 95% RTP means the house keeps 5%.</li>
+                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Volatility Index:</strong> A measure of the game's variance. High Volatility = infrequent but massive wins. Low Volatility = frequent but small wins.</li>
+                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Hit Rate:</strong> The percentage of spins that result in any payout greater than zero.</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="cyber-card p-4">
+                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">[ GAME MECHANICS ]</h3>
+                        <ul style="list-style: none; line-height: 1.8;">
+                            <li><strong style="color: var(--primary-color);">The Grid:</strong> A standard 3x5 layout evaluated across 20 distinct paylines from left to right.</li>
+                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Free Spins:</strong> Triggered by landing 3 or more Scatter (SC) symbols. Multipliers are applied during these spins.</li>
+                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Hold & Spin:</strong> Triggered by landing 6 or more Coin (CO) symbols. The coins lock in place, granting 3 respins to collect more. Filling all 15 positions awards the <strong>Grand Jackpot</strong>!</li>
+                        </ul>
                     </div>
                 </div>
             </section>
