@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber-Slot Simulation Engine</title>
+    <title>Slot Game Simulation Engine</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -16,10 +16,10 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="cyber-grid"></div>
     <div class="background-orbs">
         <div class="orb orb-1"></div>
         <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
     </div>
 
     <div class="audio-toggle-container">
@@ -27,92 +27,92 @@
     </div>
 
     <main class="container">
-        <header class="glass-panel text-center cyber-header">
-            <h1 class="glitch" data-text="CYBER-SLOT ENGINE">CYBER-SLOT ENGINE</h1>
-            <p>High-Performance Monte Carlo Simulator // V2.0</p>
+        <header class="glass-panel text-center">
+            <h1>SLOT ENGINE</h1>
+            <p>High-Performance Monte Carlo Simulator & Math Designer</p>
         </header>
         
-        <div class="tabs cyber-tabs">
-            <button class="tab-btn active" data-tab="dashboard">SYS_DASHBOARD</button>
-            <button class="tab-btn" data-tab="reel-editor">REEL_CONFIG</button>
-            <button class="tab-btn" data-tab="visual-spin">VISUALIZER</button>
-            <button class="tab-btn" data-tab="documentation">DOCS_PAYTABLE</button>
-            <button class="tab-btn" data-tab="about">SYS_ABOUT</button>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">Math Dashboard</button>
+            <button class="tab-btn" data-tab="reel-editor">Reel Editor</button>
+            <button class="tab-btn" data-tab="visual-spin">Visual Spinner</button>
+            <button class="tab-btn" data-tab="documentation">Documentation</button>
+            <button class="tab-btn" data-tab="about">About</button>
         </div>
 
         <!-- Dashboard Tab -->
         <div id="dashboard" class="tab-content active">
             <div class="dashboard">
                 <!-- Controls Panel -->
-                <section class="glass-panel controls-panel cyber-panel">
-                    <h2>// SIM_PARAMETERS</h2>
+                <section class="glass-panel controls-panel">
+                    <h2>Simulation Parameters</h2>
                     
                     <div class="form-group">
-                        <label for="numSpins">SPIN_CYCLES</label>
-                        <input type="number" id="numSpins" value="1000000" min="1000" max="50000000" step="1000" class="cyber-input">
+                        <label for="numSpins">Number of Spins</label>
+                        <input type="number" id="numSpins" value="1000000" min="1000" max="50000000" step="1000">
                     </div>
 
                     <div class="form-group">
-                        <label for="coinProb">JACKPOT_COIN_PROBABILITY</label>
-                        <input type="number" id="coinProb" value="0.05" step="0.01" min="0" max="1" class="cyber-input">
-                        <small>Mini/Minor/Major/Grand Triggers</small>
+                        <label for="coinProb">Hold & Spin Coin Probability</label>
+                        <input type="number" id="coinProb" value="0.05" step="0.01" min="0" max="1">
+                        <small>Jackpots (Mini, Minor, Major, Grand) Enabled</small>
                     </div>
 
-                    <button id="runBtn" class="btn-primary cyber-btn">
-                        <span class="btn-text">INITIALIZE_SIM</span>
+                    <button id="runBtn" class="btn-primary">
+                        <span class="btn-text">RUN SIMULATION</span>
                         <span class="loader" id="btnLoader" style="display: none;"></span>
                     </button>
                     
                     <div class="progress-container" id="progressContainer" style="display: none;">
-                        <div class="progress-bar cyber-progress" id="progressBar"></div>
+                        <div class="progress-bar" id="progressBar"></div>
                         <span class="progress-text" id="progressText">0%</span>
                     </div>
 
-                    <button id="exportCsvBtn" class="btn-secondary cyber-btn-outline mt-1" style="display: none;">
-                        [↓] EXPORT_CSV
+                    <button id="exportCsvBtn" class="btn-secondary mt-1" style="display: none;">
+                        ⬇️ EXPORT RESULTS TO CSV
                     </button>
                 </section>
 
                 <!-- Results Panel -->
-                <section class="glass-panel results-panel cyber-panel">
-                    <h2>// MATH_OUTPUT</h2>
+                <section class="glass-panel results-panel">
+                    <h2>Mathematical Breakdown</h2>
                     
                     <div class="metrics-grid">
-                        <div class="metric-card cyber-card">
+                        <div class="metric-card">
                             <h3>Total RTP</h3>
                             <p class="metric-value highlight" id="mTotalRtp">--%</p>
                         </div>
-                        <div class="metric-card cyber-card">
-                            <h3>Volatility</h3>
+                        <div class="metric-card">
+                            <h3>Volatility Index</h3>
                             <p class="metric-value" id="mVol">--</p>
                         </div>
-                        <div class="metric-card cyber-card">
+                        <div class="metric-card">
                             <h3>Hit Rate</h3>
                             <p class="metric-value" id="mHitRate">--%</p>
                         </div>
-                        <div class="metric-card cyber-card">
+                        <div class="metric-card">
                             <h3>Free Spins</h3>
                             <p class="metric-value" id="mBonusFreq">1 in --</p>
                         </div>
-                        <div class="metric-card cyber-card">
+                        <div class="metric-card">
                             <h3>Hold & Spin</h3>
                             <p class="metric-value" id="mHsFreq">1 in --</p>
                         </div>
-                        <div class="metric-card cyber-card">
-                            <h3>Grand Jpt</h3>
-                            <p class="metric-value highlight-cyan" id="mGrandFreq">1 in --</p>
+                        <div class="metric-card">
+                            <h3>Grand Jackpot</h3>
+                            <p class="metric-value" id="mGrandFreq">1 in --</p>
                         </div>
                     </div>
 
                     <div class="charts-row">
-                        <div class="chart-wrapper cyber-chart-box">
+                        <div class="chart-wrapper">
                             <canvas id="rtpChart"></canvas>
                         </div>
-                        <div class="chart-wrapper cyber-chart-box">
+                        <div class="chart-wrapper">
                             <canvas id="bucketChart"></canvas>
                         </div>
                     </div>
-                    <div class="chart-wrapper-large cyber-chart-box">
+                    <div class="chart-wrapper-large">
                         <canvas id="balanceChart"></canvas>
                     </div>
                 </section>
@@ -121,14 +121,14 @@
 
         <!-- Reel Editor Tab -->
         <div id="reel-editor" class="tab-content">
-            <section class="glass-panel text-center cyber-panel">
-                <h2>// REEL_WEIGHT_CONFIG</h2>
-                <p class="cyber-subtext">OVERRIDE PROCEDURAL GENERATION WEIGHTS</p>
+            <section class="glass-panel text-center">
+                <h2>Reel Strip Base Weights</h2>
+                <p>Modify the base symbol weights or quickly load a volatility preset.</p>
                 
                 <div class="preset-buttons">
-                    <button class="btn-preset cyber-btn-small" id="presetLow">PRESET: LOW_VOL</button>
-                    <button class="btn-preset cyber-btn-small" id="presetMed">PRESET: MED_VOL</button>
-                    <button class="btn-preset cyber-btn-small" id="presetHigh">PRESET: HIGH_VOL</button>
+                    <button class="btn-preset" id="presetLow">Low Volatility</button>
+                    <button class="btn-preset" id="presetMed">Medium Volatility</button>
+                    <button class="btn-preset" id="presetHigh">High Volatility</button>
                 </div>
 
                 <div class="editor-grid" id="editorGrid">
@@ -139,11 +139,12 @@
 
         <!-- Visual Spin Tab -->
         <div id="visual-spin" class="tab-content">
-            <section class="glass-panel text-center cyber-panel">
-                <h2>// SLOT_VISUALIZER</h2>
+            <section class="glass-panel text-center">
+                <h2>Visual Simulator</h2>
+                <p>Experience the math model dynamically.</p>
                 
-                <div class="slot-machine cyber-slot-border">
-                    <div class="slot-grid cyber-slot-grid" id="slotGrid">
+                <div class="slot-machine">
+                    <div class="slot-grid" id="slotGrid">
                         <!-- 15 positions -->
                         <div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div>
                         <div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div>
@@ -152,24 +153,24 @@
                 </div>
                 
                 <div class="spin-controls" style="display: flex; gap: 1rem; justify-content: center; max-width: 400px; margin: 0 auto;">
-                    <button id="spinOnceBtn" class="btn-primary cyber-btn" style="flex: 2;">ENGAGE_SPIN</button>
-                    <button id="autoSpinBtn" class="btn-secondary cyber-btn-outline" style="flex: 1;">AUTO</button>
+                    <button id="spinOnceBtn" class="btn-primary" style="flex: 2;">SPIN ONCE</button>
+                    <button id="autoSpinBtn" class="btn-secondary" style="flex: 1;">AUTO</button>
                 </div>
                 
-                <div class="win-display cyber-win-display" id="winDisplay">WIN: 0.00</div>
+                <div class="win-display" id="winDisplay">WIN: 0.00</div>
             </section>
         </div>
 
         <!-- Documentation Tab -->
         <div id="documentation" class="tab-content">
-            <section class="glass-panel cyber-panel">
-                <h2 class="text-center">// MATH_DOCUMENTATION</h2>
-                <p class="text-center cyber-subtext">PAYTABLE AND SYMBOL DISTRIBUTION</p>
+            <section class="glass-panel">
+                <h2 class="text-center">Math Documentation</h2>
+                <p class="text-center" style="color: var(--text-secondary);">Paytable and Symbol Distribution</p>
                 
                 <div class="dashboard" style="grid-template-columns: 1fr 1fr; margin-top: 2rem;">
                     <!-- Paytable -->
-                    <div class="cyber-card p-4">
-                        <h3 class="mb-2" style="color: var(--primary-color);">[ PAYTABLE_MATRIX ]</h3>
+                    <div class="metric-card p-4">
+                        <h3 class="mb-2" style="color: var(--primary-color);">Paytable</h3>
                         <table class="cyber-table" id="paytableTable">
                             <thead>
                                 <tr><th>SYM</th><th>3 OF A KIND</th><th>4 OF A KIND</th><th>5 OF A KIND</th></tr>
@@ -181,9 +182,9 @@
                     </div>
 
                     <!-- Reel Strips -->
-                    <div class="cyber-card p-4">
-                        <h3 class="mb-2" style="color: var(--success-color);">[ REEL_STRIP_DISTRIBUTION ]</h3>
-                        <p class="cyber-subtext mb-2">Symbol count per reel based on current weights.</p>
+                    <div class="metric-card p-4">
+                        <h3 class="mb-2" style="color: var(--success-color);">Reel Strip Distribution</h3>
+                        <p style="color: var(--text-secondary); margin-bottom: 1rem;">Symbol count per reel based on current weights.</p>
                         <table class="cyber-table" id="reelsTable">
                             <thead>
                                 <tr><th>SYM</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>R5</th></tr>
@@ -199,12 +200,12 @@
 
         <!-- About Tab -->
         <div id="about" class="tab-content">
-            <section class="glass-panel cyber-panel">
-                <h2 class="text-center">// SYSTEM_DOCUMENTATION</h2>
-                <p class="text-center cyber-subtext">HOW THE SLOT ENGINE WORKS</p>
+            <section class="glass-panel">
+                <h2 class="text-center">System Documentation</h2>
+                <p class="text-center" style="color: var(--text-secondary);">How the Slot Engine Works</p>
                 
-                <div class="cyber-card p-4" style="margin-top: 2rem; margin-bottom: 2rem;">
-                    <h3 style="color: var(--primary-color); margin-bottom: 1rem;">[ WHAT IS THIS? ]</h3>
+                <div class="metric-card p-4" style="margin-top: 2rem; margin-bottom: 2rem;">
+                    <h3 style="color: var(--primary-color); margin-bottom: 1rem;">What is this?</h3>
                     <p style="margin-bottom: 1rem; line-height: 1.6;">
                         This is a <strong>Monte Carlo Simulation Engine</strong> designed to test and balance slot machine mathematics. 
                         In the casino gaming industry, math models must be rigorously tested to ensure they hit target payouts and remain profitable for the house while being engaging for the player. 
@@ -213,8 +214,8 @@
                 </div>
 
                 <div class="dashboard" style="grid-template-columns: 1fr 1fr;">
-                    <div class="cyber-card p-4">
-                        <h3 style="color: var(--secondary-color); margin-bottom: 1rem;">[ KEY METRICS ]</h3>
+                    <div class="metric-card p-4">
+                        <h3 style="color: var(--secondary-color); margin-bottom: 1rem;">Key Metrics</h3>
                         <ul style="list-style: none; line-height: 1.8;">
                             <li><strong style="color: var(--primary-color);">RTP (Return to Player):</strong> The theoretical percentage of wagered money paid back over millions of spins. Example: 95% RTP means the house keeps 5%.</li>
                             <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Volatility Index:</strong> A measure of the game's variance. High Volatility = infrequent but massive wins. Low Volatility = frequent but small wins.</li>
@@ -222,8 +223,8 @@
                         </ul>
                     </div>
                     
-                    <div class="cyber-card p-4">
-                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">[ GAME MECHANICS ]</h3>
+                    <div class="metric-card p-4">
+                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">Game Mechanics</h3>
                         <ul style="list-style: none; line-height: 1.8;">
                             <li><strong style="color: var(--primary-color);">The Grid:</strong> A standard 3x5 layout evaluated across 20 distinct paylines from left to right.</li>
                             <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Free Spins:</strong> Triggered by landing 3 or more Scatter (SC) symbols. Multipliers are applied during these spins.</li>

@@ -342,8 +342,8 @@ function updateMetrics(results) {
 }
 
 function renderCharts(results) {
-    Chart.defaults.color = '#00e5ff';
-    Chart.defaults.font.family = "'Rajdhani', sans-serif";
+    Chart.defaults.color = '#94a3b8';
+    Chart.defaults.font.family = "'Space Grotesk', sans-serif";
 
     if (rtpChartInstance) rtpChartInstance.destroy();
     rtpChartInstance = new Chart(document.getElementById('rtpChart').getContext('2d'), {
@@ -352,16 +352,15 @@ function renderCharts(results) {
             labels: ['Base Game', 'Bonus', 'Hold & Spin', 'House Edge'],
             datasets: [{
                 data: [results.base_rtp*100, results.bonus_rtp*100, results.hs_rtp*100, Math.max(0, 100 - results.total_rtp*100)],
-                backgroundColor: ['#00e5ff', '#00e676', '#f50057', 'rgba(0, 229, 255, 0.1)'],
-                borderWidth: 1,
-                borderColor: '#020205'
+                backgroundColor: ['#4c72b0', '#55a868', '#c44e52', 'rgba(255, 255, 255, 0.05)'],
+                borderWidth: 0
             }]
         },
         options: {
             responsive: true, maintainAspectRatio: false, cutout: '75%',
             plugins: {
                 legend: { position: 'right' },
-                title: { display: true, text: '// RTP_DISTRIBUTION', font: { size: 16, family: 'Orbitron' } }
+                title: { display: true, text: 'RTP Contributions', font: { size: 16 } }
             }
         }
     });
@@ -374,19 +373,18 @@ function renderCharts(results) {
             datasets: [{
                 label: 'Hit Percentage',
                 data: Object.values(results.buckets),
-                backgroundColor: '#d500f9',
-                borderRadius: 2
+                backgroundColor: '#8b5cf6',
+                borderRadius: 4
             }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
             scales: { 
-                y: { type: 'logarithmic', min: 0.001, grid: { color: 'rgba(0,229,255,0.1)' } },
-                x: { grid: { display: false } }
+                y: { type: 'logarithmic', min: 0.001 }
             },
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: '// WIN_VOLATILITY (LOG_SCALE)', font: { size: 16, family: 'Orbitron' } }
+                title: { display: true, text: 'Win Distribution (Log Scale)', font: { size: 16 } }
             }
         }
     });
@@ -398,11 +396,11 @@ function renderCharts(results) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'Player Balance',
+                label: 'Player Balance (Starting at 0)',
                 data: results.balance_history,
-                borderColor: '#00e676',
-                borderWidth: 2,
-                tension: 0.1,
+                borderColor: '#10b981',
+                borderWidth: 1.5,
+                tension: 0.2,
                 pointRadius: 0
             }]
         },
@@ -410,11 +408,11 @@ function renderCharts(results) {
             responsive: true, maintainAspectRatio: false,
             interaction: { intersect: false, mode: 'index' },
             plugins: {
-                title: { display: true, text: '// BANKROLL_TRAJECTORY', font: { size: 16, family: 'Orbitron' } }
+                title: { display: true, text: 'Player Bankroll Simulation (Random Walk)', font: { size: 16 } }
             },
             scales: {
                 x: { display: false },
-                y: { grid: { color: 'rgba(0,229,255,0.1)' } }
+                y: { grid: { color: 'rgba(255,255,255,0.05)' } }
             }
         }
     });
