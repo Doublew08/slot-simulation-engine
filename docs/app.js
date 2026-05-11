@@ -308,12 +308,10 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (bal < betSize) break; // Bankrupt
                             bal -= betSize;
                             
-                            let grid = currentSim.engine.spin();
-                            let base_payout = currentSim.evaluator.evaluate(grid);
-                            let scatters = currentSim.evaluator.evaluate_scatters(grid);
-                            let hs_res = currentSim.run_hs(grid);
+                            let cascade_res = currentSim.run_cascade_spin();
                             
-                            let totalWin = (base_payout + scatters.payout + hs_res.payout) * betSize;
+                            let totalWin = (cascade_res.payout + cascade_res.scatter_payout) * betSize;
+                            if (cascade_res.hs_triggered) totalWin += cascade_res.hs_payout * betSize;
                             bal += totalWin;
                         }
                         
