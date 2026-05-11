@@ -175,7 +175,7 @@ class Simulation {
         this.bet_amount = 1.0;
         // Default weights
         this.defaultWeights = {
-            "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3
+            "W": 1, "H1": 2, "H2": 2, "M1": 3, "M2": 3, "L1": 30, "L2": 35, "SC": 1, "CO": 2
         };
         this.setupGame(this.defaultWeights, 0.05);
     }
