@@ -25,74 +25,119 @@
     <main class="container">
         <header class="glass-panel text-center">
             <h1>SLOT ENGINE</h1>
-            <p>High-Performance Monte Carlo Simulator</p>
+            <p>High-Performance Monte Carlo Simulator & Math Designer</p>
         </header>
+        
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">Math Dashboard</button>
+            <button class="tab-btn" data-tab="reel-editor">Reel Editor</button>
+            <button class="tab-btn" data-tab="visual-spin">Visual Spinner</button>
+        </div>
 
-        <div class="dashboard">
-            <!-- Controls Panel -->
-            <section class="glass-panel controls-panel">
-                <h2>Simulation Parameters</h2>
-                
-                <div class="form-group">
-                    <label for="numSpins">Number of Spins</label>
-                    <input type="number" id="numSpins" value="1000000" min="1000" max="50000000" step="1000">
-                    <small>Default: 1,000,000</small>
-                </div>
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="dashboard">
+                <!-- Controls Panel -->
+                <section class="glass-panel controls-panel">
+                    <h2>Simulation Parameters</h2>
+                    
+                    <div class="form-group">
+                        <label for="numSpins">Number of Spins</label>
+                        <input type="number" id="numSpins" value="1000000" min="1000" max="50000000" step="1000">
+                    </div>
 
-                <div class="form-group">
-                    <label for="wildWeight">Wild Symbol Base Weight</label>
-                    <input type="number" id="wildWeight" value="4.238" step="0.001">
-                    <small>Optimized for 95% RTP: 4.238</small>
-                </div>
+                    <div class="form-group">
+                        <label for="coinProb">Hold & Spin Coin Probability</label>
+                        <input type="number" id="coinProb" value="0.05" step="0.01" min="0" max="1">
+                        <small>Jackpots (Mini, Minor, Major, Grand) Enabled</small>
+                    </div>
 
-                <div class="form-group">
-                    <label for="coinProb">Hold & Spin Coin Probability</label>
-                    <input type="number" id="coinProb" value="0.05" step="0.01" min="0" max="1">
-                    <small>Probability per empty cell respin</small>
-                </div>
+                    <button id="runBtn" class="btn-primary">
+                        <span class="btn-text">RUN SIMULATION</span>
+                        <span class="loader" id="btnLoader" style="display: none;"></span>
+                    </button>
+                    
+                    <div class="progress-container" id="progressContainer" style="display: none;">
+                        <div class="progress-bar" id="progressBar"></div>
+                        <span class="progress-text" id="progressText">0%</span>
+                    </div>
+                </section>
 
-                <button id="runBtn" class="btn-primary">
-                    <span class="btn-text">RUN SIMULATION</span>
-                    <span class="loader" id="btnLoader" style="display: none;"></span>
-                </button>
-                
-                <div class="progress-container" id="progressContainer" style="display: none;">
-                    <div class="progress-bar" id="progressBar"></div>
-                    <span class="progress-text" id="progressText">0%</span>
+                <!-- Results Panel -->
+                <section class="glass-panel results-panel">
+                    <h2>Mathematical Breakdown</h2>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <h3>Total RTP</h3>
+                            <p class="metric-value highlight" id="mTotalRtp">--%</p>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Volatility Index</h3>
+                            <p class="metric-value" id="mVol">--</p>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Hit Rate</h3>
+                            <p class="metric-value" id="mHitRate">--%</p>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Free Spins</h3>
+                            <p class="metric-value" id="mBonusFreq">1 in --</p>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Hold & Spin</h3>
+                            <p class="metric-value" id="mHsFreq">1 in --</p>
+                        </div>
+                        <div class="metric-card">
+                            <h3>Grand Jackpot</h3>
+                            <p class="metric-value" id="mGrandFreq">1 in --</p>
+                        </div>
+                    </div>
+
+                    <div class="charts-row">
+                        <div class="chart-wrapper">
+                            <canvas id="rtpChart"></canvas>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="bucketChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-wrapper-large">
+                        <canvas id="balanceChart"></canvas>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <!-- Reel Editor Tab -->
+        <div id="reel-editor" class="tab-content">
+            <section class="glass-panel">
+                <h2>Reel Strip Base Weights</h2>
+                <p>Modify the base symbol weights. These are applied to Reel 1, and procedurally scaled across Reels 2-5.</p>
+                <div class="editor-grid" id="editorGrid">
+                    <!-- Populated by JS -->
                 </div>
             </section>
+        </div>
 
-            <!-- Results Panel -->
-            <section class="glass-panel results-panel">
-                <h2>Mathematical Breakdown</h2>
+        <!-- Visual Spin Tab -->
+        <div id="visual-spin" class="tab-content">
+            <section class="glass-panel text-center">
+                <h2>Visual Simulator</h2>
+                <p>Experience the math model dynamically.</p>
                 
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <h3>Total RTP</h3>
-                        <p class="metric-value highlight" id="mTotalRtp">--%</p>
-                    </div>
-                    <div class="metric-card">
-                        <h3>Volatility Index</h3>
-                        <p class="metric-value" id="mVol">--</p>
-                    </div>
-                    <div class="metric-card">
-                        <h3>Base Hit Rate</h3>
-                        <p class="metric-value" id="mHitRate">--%</p>
-                    </div>
-                    <div class="metric-card">
-                        <h3>Bonus Trigger</h3>
-                        <p class="metric-value" id="mBonusFreq">1 in --</p>
-                    </div>
-                    <div class="metric-card">
-                        <h3>Hold & Spin</h3>
-                        <p class="metric-value" id="mHsFreq">1 in --</p>
+                <div class="slot-machine">
+                    <div class="slot-grid" id="slotGrid">
+                        <!-- 15 positions -->
+                        <div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div>
+                        <div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div>
+                        <div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div><div class="slot-cell"></div>
                     </div>
                 </div>
-
-                <div class="charts-container">
-                    <div class="chart-wrapper">
-                        <canvas id="rtpChart"></canvas>
-                    </div>
+                
+                <div class="spin-controls">
+                    <button id="spinOnceBtn" class="btn-primary" style="max-width: 300px; margin: 0 auto;">SPIN ONCE</button>
+                    <div class="win-display" id="winDisplay">WIN: 0.00</div>
                 </div>
             </section>
         </div>
