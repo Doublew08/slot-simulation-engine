@@ -1,3 +1,4 @@
+
 // Paytable and Evaluation logic ported to JS
 
 class SymbolDef {
@@ -182,14 +183,14 @@ class Simulation {
     
     setupGame(customWeights, coinProbability) {
         let symbols = [
-            new SymbolDef("W", {3: 0.25, 4: 1.0, 5: 4.0}, true),
-            new SymbolDef("H1", {3: 0.2, 4: 0.75, 5: 2.0}),
-            new SymbolDef("H2", {3: 0.15, 4: 0.5, 5: 1.5}),
-            new SymbolDef("M1", {3: 0.1, 4: 0.4, 5: 1.0}),
-            new SymbolDef("M2", {3: 0.1, 4: 0.3, 5: 0.8}),
-            new SymbolDef("L1", {3: 0.05, 4: 0.2, 5: 0.5}),
-            new SymbolDef("L2", {3: 0.05, 4: 0.15, 5: 0.4}),
-            new SymbolDef("SC", {3: 1.0, 4: 4.0, 5: 20.0}, false, true),
+            new SymbolDef("W", {3: 0.5, 4: 2.0, 5: 10.0}, true),
+            new SymbolDef("H1", {3: 0.4, 4: 1.5, 5: 5.0}),
+            new SymbolDef("H2", {3: 0.3, 4: 1.0, 5: 4.0}),
+            new SymbolDef("M1", {3: 0.2, 4: 0.8, 5: 2.5}),
+            new SymbolDef("M2", {3: 0.2, 4: 0.6, 5: 2.0}),
+            new SymbolDef("L1", {3: 0.1, 4: 0.4, 5: 1.5}),
+            new SymbolDef("L2", {3: 0.1, 4: 0.3, 5: 1.0}),
+            new SymbolDef("SC", {3: 2.0, 4: 10.0, 5: 50.0}, false, true),
             new SymbolDef("CO", {}, false, false, true)
         ];
         this.paytable = new Paytable(symbols);
@@ -588,3 +589,20 @@ class Simulation {
         });
     }
 }
+
+
+let sim = new Simulation();
+let bal = 100;
+let betSize = 1;
+for (let i = 0; i < 100000; i++) {
+    let cascade_res = sim.run_cascade_spin();
+    let totalWin = (cascade_res.payout + cascade_res.scatter_payout) * betSize;
+    if (cascade_res.hs_triggered) totalWin += cascade_res.hs_payout * betSize;
+    bal += totalWin;
+    if (isNaN(bal)) {
+        console.log("Found NaN at spin", i);
+        console.log("cascade_res", cascade_res);
+        break;
+    }
+}
+console.log("End bankroll:", bal);
