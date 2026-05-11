@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot Game Simulation Engine</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <main class="container">
+        <header class="glass-panel text-center">
+            <h1>SLOT ENGINE</h1>
+            <p>High-Performance Monte Carlo Simulator</p>
+        </header>
+
+        <div class="dashboard">
+            <!-- Controls Panel -->
+            <section class="glass-panel controls-panel">
+                <h2>Simulation Parameters</h2>
+                
+                <div class="form-group">
+                    <label for="numSpins">Number of Spins</label>
+                    <input type="number" id="numSpins" value="1000000" min="1000" max="50000000" step="1000">
+                    <small>Default: 1,000,000</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="wildWeight">Wild Symbol Base Weight</label>
+                    <input type="number" id="wildWeight" value="4.238" step="0.001">
+                    <small>Optimized for 95% RTP: 4.238</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="coinProb">Hold & Spin Coin Probability</label>
+                    <input type="number" id="coinProb" value="0.05" step="0.01" min="0" max="1">
+                    <small>Probability per empty cell respin</small>
+                </div>
+
+                <button id="runBtn" class="btn-primary">
+                    <span class="btn-text">RUN SIMULATION</span>
+                    <span class="loader" id="btnLoader" style="display: none;"></span>
+                </button>
+                
+                <div class="progress-container" id="progressContainer" style="display: none;">
+                    <div class="progress-bar" id="progressBar"></div>
+                    <span class="progress-text" id="progressText">0%</span>
+                </div>
+            </section>
+
+            <!-- Results Panel -->
+            <section class="glass-panel results-panel">
+                <h2>Mathematical Breakdown</h2>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>Total RTP</h3>
+                        <p class="metric-value highlight" id="mTotalRtp">--%</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Volatility Index</h3>
+                        <p class="metric-value" id="mVol">--</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Base Hit Rate</h3>
+                        <p class="metric-value" id="mHitRate">--%</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Bonus Trigger</h3>
+                        <p class="metric-value" id="mBonusFreq">1 in --</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Hold & Spin</h3>
+                        <p class="metric-value" id="mHsFreq">1 in --</p>
+                    </div>
+                </div>
+
+                <div class="charts-container">
+                    <div class="chart-wrapper">
+                        <canvas id="rtpChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="engine.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
