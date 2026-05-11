@@ -1,9 +1,50 @@
 let rtpChartInstance = null;
 let bucketChartInstance = null;
 let balanceChartInstance = null;
-let currentSim = null; // Store for visual spin
-let lastResults = null; // For CSV export
-let autoSpinInterval = null; // For Auto-Spin
+let currentSim = null; 
+let lastResults = null; 
+let autoSpinInterval = null; 
+
+// --- AUDIO ENGINE ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let soundEnabled = true;
+
+function playTone(freq, type, duration, vol=0.1) {
+    if (!soundEnabled) return;
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    
+    gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+function playSpinSound() {
+    // fast clicking
+    for(let i=0; i<5; i++) {
+        setTimeout(() => playTone(300 + Math.random()*100, 'square', 0.05, 0.02), i*100);
+    }
+}
+
+function playWinSound() {
+    playTone(523.25, 'sine', 0.3, 0.1); // C5
+    setTimeout(() => playTone(659.25, 'sine', 0.5, 0.1), 150); // E5
+    setTimeout(() => playTone(783.99, 'sine', 0.8, 0.1), 300); // G5
+}
+
+function playJackpotSound() {
+    for(let i=0; i<10; i++) {
+        setTimeout(() => playTone(880, 'sawtooth', 0.2, 0.15), i*200);
+        setTimeout(() => playTone(440, 'sawtooth', 0.2, 0.15), (i*200)+100);
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // --- TABS LOGIC ---
@@ -18,6 +59,22 @@ document.addEventListener('DOMContentLoaded', () => {
             btn.classList.add('active');
             document.getElementById(btn.dataset.tab).classList.add('active');
         });
+    });
+
+    // --- AUDIO TOGGLE ---
+    const audioToggleBtn = document.getElementById('audioToggleBtn');
+    audioToggleBtn.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        if(soundEnabled) {
+            audioCtx.resume();
+            audioToggleBtn.innerText = "🔊 SOUND ON";
+            audioToggleBtn.style.color = "var(--primary-color)";
+            audioToggleBtn.style.borderColor = "var(--primary-color)";
+        } else {
+            audioToggleBtn.innerText = "🔇 SOUND OFF";
+            audioToggleBtn.style.color = "var(--secondary-color)";
+            audioToggleBtn.style.borderColor = "var(--secondary-color)";
+        }
     });
 
     // --- REEL EDITOR & PRESETS LOGIC ---
@@ -38,7 +95,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 <input type="number" id="weight_${sym}" value="${weights[sym]}" step="0.1" min="0">
             `;
             editorGrid.appendChild(card);
+            
+            // Add listener to update documentation when weight changes
+            document.getElementById(`weight_${sym}`).addEventListener('change', updateDocumentation);
         }
+        updateDocumentation();
     }
     
     // Init with medium
@@ -56,6 +117,49 @@ document.addEventListener('DOMContentLoaded', () => {
             cw[sym] = isNaN(val) ? presets.med[sym] : val;
         }
         return cw;
+    }
+
+    // --- DOCUMENTATION RENDER LOGIC ---
+    function updateDocumentation() {
+        if (!currentSim) {
+            currentSim = new Simulation();
+        }
+        currentSim.setupGame(getCustomWeights(), 0.05);
+
+        // Render Paytable
+        const ptBody = document.querySelector('#paytableTable tbody');
+        ptBody.innerHTML = '';
+        
+        const symsToDisplay = ["W", "H1", "H2", "M1", "M2", "L1", "L2", "SC", "CO"];
+        symsToDisplay.forEach(symName => {
+            let symDef = currentSim.paytable.get(symName);
+            let p3 = symDef.payouts[3] || 0;
+            let p4 = symDef.payouts[4] || 0;
+            let p5 = symDef.payouts[5] || 0;
+            
+            if(symDef.is_scatter) { p3 += " (Total Bet)"; p4 += " (Total Bet)"; p5 += " (Total Bet)"; }
+            if(symDef.is_coin) { p3 = "Jackpot"; p4 = "Jackpot"; p5 = "Jackpot"; }
+            if(symName === "W") { p3 += " / Wild"; p4 += " / Wild"; p5 += " / Wild"; }
+            
+            ptBody.innerHTML += `<tr>
+                <td style="color: var(--primary-color); font-weight: bold;">${symName}</td>
+                <td>${p3}</td><td>${p4}</td><td>${p5}</td>
+            </tr>`;
+        });
+
+        // Render Reel Strips
+        const reelsBody = document.querySelector('#reelsTable tbody');
+        reelsBody.innerHTML = '';
+        
+        symsToDisplay.forEach(symName => {
+            let rowHtml = `<tr><td style="color: var(--success-color); font-weight: bold;">${symName}</td>`;
+            currentSim.engine.reels.forEach(reel => {
+                let count = reel.pool.filter(s => s === symName).length;
+                rowHtml += `<td>${count}</td>`;
+            });
+            rowHtml += `</tr>`;
+            reelsBody.innerHTML += rowHtml;
+        });
     }
 
     // --- SIMULATION LOGIC ---
@@ -81,6 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         currentSim = new Simulation();
         currentSim.setupGame(getCustomWeights(), coinProb);
+        updateDocumentation(); // sync documentation
 
         lastResults = await currentSim.runSimulation(numSpins, (percent) => {
             progressBar.style.width = `${percent}%`;
@@ -108,9 +213,6 @@ document.addEventListener('DOMContentLoaded', () => {
         csvContent += `Hold & Spin RTP,${(lastResults.hs_rtp*100).toFixed(4)}%\n`;
         csvContent += `Hit Rate,${(lastResults.hit_rate*100).toFixed(4)}%\n`;
         csvContent += `Volatility Index,${lastResults.volatility.toFixed(4)}\n`;
-        csvContent += `Bonus Frequency,1 in ${lastResults.bonus_freq.toFixed(1)}\n`;
-        csvContent += `Hold & Spin Frequency,1 in ${lastResults.hs_freq.toFixed(1)}\n`;
-        csvContent += `Grand Jackpot Frequency,1 in ${lastResults.grand_freq.toFixed(1)}\n`;
         
         for(let b in lastResults.buckets) {
             csvContent += `Bucket ${b},${lastResults.buckets[b].toFixed(4)}%\n`;
@@ -119,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "slot_simulation_results.csv");
+        link.setAttribute("download", "cyberslot_results.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -132,6 +234,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const winDisplay = document.getElementById('winDisplay');
     
     function doVisualSpin() {
+        // Must resume AudioContext on first user interaction if locked
+        if(audioCtx.state === 'suspended') audioCtx.resume();
+
+        playSpinSound();
+
         if (!currentSim) {
             currentSim = new Simulation();
             currentSim.setupGame(getCustomWeights(), 0.05);
@@ -139,7 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let grid = currentSim.engine.spin();
         
-        // Remove previous animations
         slotCells.forEach(cell => cell.classList.remove('win-pulse'));
         
         let flatIndex = 0;
@@ -164,30 +270,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (scatters.count >= 3) {
             text += ` | FREE SPINS!`;
             isBigWin = true;
-            // Pulse scatters
             slotCells.forEach(cell => { if(cell.innerText === 'SC') cell.classList.add('win-pulse'); });
         }
         if (hs_res.triggered) {
             text += ` | HOLD & SPIN WIN: ${hs_res.payout.toFixed(2)}`;
             isBigWin = true;
-            // Pulse coins
             slotCells.forEach(cell => { if(cell.innerText === 'CO') cell.classList.add('win-pulse'); });
         }
         
         if (hs_res.grand) {
             text = `💰 GRAND JACKPOT! 💰`;
-            slotCells.forEach(cell => cell.classList.add('win-pulse')); // Pulse everything
-        } else if (base_payout > 5.0) {
+            slotCells.forEach(cell => cell.classList.add('win-pulse')); 
+            playJackpotSound();
+        } else if (isBigWin || base_payout > 5.0) {
             isBigWin = true;
-            // Pulse Wilds on a big base win
             slotCells.forEach(cell => { if(cell.innerText === 'W') cell.classList.add('win-pulse'); });
+            playWinSound();
+        } else if (base_payout > 0) {
+            playTone(400, 'sine', 0.1, 0.05); // Small win tick
         }
         
         if (isBigWin || base_payout > 0) {
             winDisplay.style.color = 'var(--success-color)';
+            winDisplay.style.textShadow = '0 0 20px rgba(0, 230, 118, 0.6)';
         } else {
             winDisplay.style.color = 'var(--text-secondary)';
-            text = "NO WIN";
+            winDisplay.style.textShadow = 'none';
+            text = "SYSTEM READY";
         }
         
         winDisplay.innerText = text;
@@ -210,10 +319,10 @@ document.addEventListener('DOMContentLoaded', () => {
             autoSpinBtn.classList.remove('active');
             autoSpinBtn.innerText = "AUTO";
         } else {
-            autoSpinInterval = setInterval(doVisualSpin, 1200); // 1.2 seconds per spin
+            autoSpinInterval = setInterval(doVisualSpin, 1200);
             autoSpinBtn.classList.add('active');
             autoSpinBtn.innerText = "STOP AUTO";
-            doVisualSpin(); // do first spin immediately
+            doVisualSpin(); 
         }
     });
 });
@@ -222,7 +331,7 @@ function updateMetrics(results) {
     document.getElementById('mTotalRtp').innerText = (results.total_rtp * 100).toFixed(2) + '%';
     const rtpEl = document.getElementById('mTotalRtp');
     if (results.total_rtp * 100 >= 94 && results.total_rtp * 100 <= 96) rtpEl.style.color = 'var(--success-color)';
-    else rtpEl.style.color = '#ef4444';
+    else rtpEl.style.color = '#f50057';
 
     document.getElementById('mVol').innerText = results.volatility.toFixed(2);
     document.getElementById('mHitRate').innerText = (results.hit_rate * 100).toFixed(2) + '%';
@@ -233,8 +342,8 @@ function updateMetrics(results) {
 }
 
 function renderCharts(results) {
-    Chart.defaults.color = '#94a3b8';
-    Chart.defaults.font.family = "'Space Grotesk', sans-serif";
+    Chart.defaults.color = '#00e5ff';
+    Chart.defaults.font.family = "'Rajdhani', sans-serif";
 
     if (rtpChartInstance) rtpChartInstance.destroy();
     rtpChartInstance = new Chart(document.getElementById('rtpChart').getContext('2d'), {
@@ -243,15 +352,16 @@ function renderCharts(results) {
             labels: ['Base Game', 'Bonus', 'Hold & Spin', 'House Edge'],
             datasets: [{
                 data: [results.base_rtp*100, results.bonus_rtp*100, results.hs_rtp*100, Math.max(0, 100 - results.total_rtp*100)],
-                backgroundColor: ['#4c72b0', '#55a868', '#c44e52', 'rgba(255, 255, 255, 0.05)'],
-                borderWidth: 0
+                backgroundColor: ['#00e5ff', '#00e676', '#f50057', 'rgba(0, 229, 255, 0.1)'],
+                borderWidth: 1,
+                borderColor: '#020205'
             }]
         },
         options: {
             responsive: true, maintainAspectRatio: false, cutout: '75%',
             plugins: {
                 legend: { position: 'right' },
-                title: { display: true, text: 'RTP Contributions', font: { size: 16 } }
+                title: { display: true, text: '// RTP_DISTRIBUTION', font: { size: 16, family: 'Orbitron' } }
             }
         }
     });
@@ -264,16 +374,19 @@ function renderCharts(results) {
             datasets: [{
                 label: 'Hit Percentage',
                 data: Object.values(results.buckets),
-                backgroundColor: '#8b5cf6',
-                borderRadius: 4
+                backgroundColor: '#d500f9',
+                borderRadius: 2
             }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { y: { type: 'logarithmic', min: 0.001 } },
+            scales: { 
+                y: { type: 'logarithmic', min: 0.001, grid: { color: 'rgba(0,229,255,0.1)' } },
+                x: { grid: { display: false } }
+            },
             plugins: {
                 legend: { display: false },
-                title: { display: true, text: 'Win Distribution (Log Scale)', font: { size: 16 } }
+                title: { display: true, text: '// WIN_VOLATILITY (LOG_SCALE)', font: { size: 16, family: 'Orbitron' } }
             }
         }
     });
@@ -285,11 +398,11 @@ function renderCharts(results) {
         data: {
             labels: labels,
             datasets: [{
-                label: 'Player Balance (Starting at 0)',
+                label: 'Player Balance',
                 data: results.balance_history,
-                borderColor: '#10b981',
-                borderWidth: 1.5,
-                tension: 0.2,
+                borderColor: '#00e676',
+                borderWidth: 2,
+                tension: 0.1,
                 pointRadius: 0
             }]
         },
@@ -297,11 +410,11 @@ function renderCharts(results) {
             responsive: true, maintainAspectRatio: false,
             interaction: { intersect: false, mode: 'index' },
             plugins: {
-                title: { display: true, text: 'Player Bankroll Simulation (Random Walk)', font: { size: 16 } }
+                title: { display: true, text: '// BANKROLL_TRAJECTORY', font: { size: 16, family: 'Orbitron' } }
             },
             scales: {
                 x: { display: false },
-                y: { grid: { color: 'rgba(255,255,255,0.05)' } }
+                y: { grid: { color: 'rgba(0,229,255,0.1)' } }
             }
         }
     });
