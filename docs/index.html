@@ -60,6 +60,11 @@
                         <small>Jackpots (Mini, Minor, Major, Grand) Enabled</small>
                     </div>
 
+                    <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem;">
+                        <input type="checkbox" id="bonusBuyMode" style="width: 20px; height: 20px;">
+                        <label for="bonusBuyMode" style="margin-bottom: 0;">Feature Buy Mode (100x Bet)</label>
+                    </div>
+
                     <button id="runBtn" class="btn-primary">
                         <span class="btn-text">RUN SIMULATION</span>
                         <span class="loader" id="btnLoader" style="display: none;"></span>
@@ -111,6 +116,18 @@
                             <h3>Avg Progressive Pool</h3>
                             <p class="metric-value highlight" id="mProg">--</p>
                             <small style="color: var(--text-secondary);">Skims 0.5% bet/spin</small>
+                        </div>
+                        <div class="metric-card" style="grid-column: span 2;">
+                            <h3 style="color: #f59e0b;">Respin Analytics</h3>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-top: 0.5rem;">
+                                <span>Weak: <strong id="mWeak">--</strong></span>
+                                <span>Norm: <strong id="mNormal">--</strong></span>
+                                <span>Strong: <strong id="mStrong">--</strong></span>
+                                <span>Ultra: <strong id="mUltra">--</strong></span>
+                            </div>
+                            <div style="margin-top: 0.5rem; font-size: 0.9rem; text-align: center; color: var(--text-secondary);">
+                                Avg Upgrades per Bonus: <strong id="mUpgrades" style="color: white;">--</strong>
+                            </div>
                         </div>
                     </div>
 

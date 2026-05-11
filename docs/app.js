@@ -176,6 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     runBtn.addEventListener('click', async () => {
         const numSpins = parseInt(document.getElementById('numSpins').value) || 1000000;
         const coinProb = parseFloat(document.getElementById('coinProb').value) || 0.05;
+        const bonusBuyMode = document.getElementById('bonusBuyMode').checked;
 
         runBtn.disabled = true;
         btnText.style.display = 'none';
@@ -193,7 +194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lastResults = await currentSim.runSimulation(numSpins, (percent) => {
             progressBar.style.width = `${percent}%`;
             progressText.innerText = `${percent.toFixed(1)}%`;
-        });
+        }, bonusBuyMode);
 
         runBtn.disabled = false;
         btnText.style.display = 'block';
@@ -513,6 +514,22 @@ function updateMetrics(results) {
     let mProg = document.getElementById('mProg');
     if (mProg && results.avg_jackpot) {
         mProg.innerText = `$${Math.round(results.avg_jackpot).toLocaleString()}`;
+    }
+    
+    // Respin Analytics
+    let totalRespins = Object.values(results.strength_counts || {}).reduce((a, b) => a + b, 0);
+    if (totalRespins > 0 && results.strength_counts) {
+        document.getElementById('mWeak').innerText = `${((results.strength_counts.Weak / totalRespins) * 100).toFixed(1)}%`;
+        document.getElementById('mNormal').innerText = `${((results.strength_counts.Normal / totalRespins) * 100).toFixed(1)}%`;
+        document.getElementById('mStrong').innerText = `${((results.strength_counts.Strong / totalRespins) * 100).toFixed(1)}%`;
+        document.getElementById('mUltra').innerText = `${((results.strength_counts.Ultra / totalRespins) * 100).toFixed(1)}%`;
+        document.getElementById('mUpgrades').innerText = results.avg_upgrades ? results.avg_upgrades.toFixed(2) : '0';
+    } else {
+        document.getElementById('mWeak').innerText = '--';
+        document.getElementById('mNormal').innerText = '--';
+        document.getElementById('mStrong').innerText = '--';
+        document.getElementById('mUltra').innerText = '--';
+        document.getElementById('mUpgrades').innerText = '--';
     }
 }
 
