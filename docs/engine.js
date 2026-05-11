@@ -103,6 +103,7 @@ class Evaluator {
     evaluate(grid) {
         let total_payout = 0.0;
         let num_cols = grid[0].length;
+        let winning_coords = new Set();
         
         for (let line_idx = 0; line_idx < this.paylines.length; line_idx++) {
             let line = this.paylines[line_idx];
@@ -154,10 +155,18 @@ class Evaluator {
                 let pure_wild_payout = this.paytable.wild_name ? this.paytable.payout(this.paytable.wild_name, pure_wild_count) : 0;
                 
                 let best_payout = Math.max(payout, pure_wild_payout);
-                total_payout += best_payout;
+                if (best_payout > 0) {
+                    total_payout += best_payout;
+                    let count_to_use = (best_payout === pure_wild_payout) ? pure_wild_count : match_count;
+                    for (let i=0; i<count_to_use; i++) {
+                        winning_coords.add(`${line[i]},${i}`);
+                    }
+                }
             }
         }
-        return total_payout;
+        
+        let coords_array = Array.from(winning_coords).map(str => str.split(',').map(Number));
+        return { payout: total_payout, coords: coords_array };
     }
 }
 
@@ -221,6 +230,10 @@ class Simulation {
         }
         for(let i=0; i<5; i++) this.value_pool.push("Mini");
         this.value_pool.push("Minor");
+        
+        // Progressive Jackpot
+        this.globalJackpotPool = 10000.0;
+        this.jackpotHitTotal = 0.0;
     }
     
     _getRandomCoin() {
@@ -237,13 +250,12 @@ class Simulation {
         
         while (spins_remaining > 0) {
             spins_remaining--;
-            let grid = this.engine.spin();
-            let spin_payout = this.evaluator.evaluate(grid);
-            let scatters = this.evaluator.evaluate_scatters(grid);
+            let cascade_res = this.run_cascade_spin();
             
-            total_payout += (spin_payout * this.bonus_multiplier) + scatters.payout;
+            total_payout += (cascade_res.payout * this.bonus_multiplier) + cascade_res.scatter_payout;
+            if (cascade_res.hs_triggered) total_payout += cascade_res.hs_payout;
             
-            if (scatters.count >= this.bonus_trigger_count) {
+            if (cascade_res.scatters >= this.bonus_trigger_count) {
                 spins_remaining += this.bonus_spins;
             }
         }
@@ -304,13 +316,69 @@ class Simulation {
                 }
             }
             if (full_screen) {
-                total_value += 5000.0; // Grand
+                total_value += this.globalJackpotPool; // Progressive Award
+                this.jackpotHitTotal += this.globalJackpotPool;
+                this.globalJackpotPool = 10000.0; // Reset network pool
                 hit_grand = true;
                 break;
             }
         }
         
         return {triggered: true, payout: total_value, grand: hit_grand};
+    }
+    
+    run_cascade_spin() {
+        let grid = this.engine.spin();
+        let total_spin_payout = 0.0;
+        
+        let initial_scatters = this.evaluator.evaluate_scatters(grid);
+        let scatter_payout = initial_scatters.payout;
+        let scatter_count = initial_scatters.count;
+
+        let keep_cascading = true;
+        let cascades = 0;
+
+        while(keep_cascading && cascades < 15) {
+            let eval_res = this.evaluator.evaluate(grid);
+            if (eval_res.payout > 0) {
+                total_spin_payout += eval_res.payout;
+                let coords = eval_res.coords;
+                
+                let cols_to_remove = {};
+                for (let i=0; i<5; i++) cols_to_remove[i] = [];
+                for (let coord of coords) {
+                    cols_to_remove[coord[1]].push(coord[0]);
+                }
+                
+                for (let c=0; c<5; c++) {
+                    if (cols_to_remove[c].length > 0) {
+                        cols_to_remove[c].sort((a,b) => b-a); // Bottom up
+                        for (let r of cols_to_remove[c]) {
+                            // Shift down
+                            for(let i=r; i>0; i--) {
+                                grid[i][c] = grid[i-1][c];
+                            }
+                            grid[0][c] = this.engine.reels[c].spin_column(1)[0];
+                        }
+                    }
+                }
+                cascades++;
+            } else {
+                keep_cascading = false;
+            }
+        }
+        
+        let hs_res = this.run_hs(grid);
+        
+        return {
+            payout: total_spin_payout,
+            scatters: scatter_count,
+            scatter_payout: scatter_payout,
+            hs_triggered: hs_res.triggered,
+            hs_payout: hs_res.payout,
+            hs_grand: hs_res.grand,
+            final_grid: grid
+        };
     }
     
     runSimulation(numSpins, progressCallback) {
@@ -345,32 +413,31 @@ class Simulation {
                 for (; spin_idx < end; spin_idx++) {
                     total_spent += this.bet_amount;
                     current_balance -= this.bet_amount;
+                    this.globalJackpotPool += this.bet_amount * 0.005; // 0.5% contribution to progressive
+                    
                     let spin_total_win = 0.0;
                     
-                    let grid = this.engine.spin();
-                    let base_payout = this.evaluator.evaluate(grid);
-                    let scatters = this.evaluator.evaluate_scatters(grid);
+                    let cascade_res = this.run_cascade_spin();
                     
-                    let base_spin_win = base_payout + scatters.payout;
+                    let base_spin_win = cascade_res.payout + cascade_res.scatter_payout;
                     if (base_spin_win > 0) {
                         base_hits++;
                         base_win_total += base_spin_win;
                         spin_total_win += base_spin_win;
                     }
                     
-                    if (scatters.count >= this.bonus_trigger_count) {
+                    if (cascade_res.scatters >= this.bonus_trigger_count) {
                         bonus_triggers++;
                         let b_payout = this.run_free_spins();
                         bonus_win_total += b_payout;
                         spin_total_win += b_payout;
                     }
                     
-                    let hs_res = this.run_hs(grid);
-                    if (hs_res.triggered) {
+                    if (cascade_res.hs_triggered) {
                         hs_triggers++;
-                        hs_win_total += hs_res.payout;
-                        spin_total_win += hs_res.payout;
-                        if (hs_res.grand) grand_hits++;
+                        hs_win_total += cascade_res.hs_payout;
+                        spin_total_win += cascade_res.hs_payout;
+                        if (cascade_res.hs_grand) grand_hits++;
                     }
                     
                     sum_win += spin_total_win;
@@ -423,6 +490,7 @@ class Simulation {
                         bonus_freq: bonus_triggers > 0 ? numSpins / bonus_triggers : 0,
                         hs_freq: hs_triggers > 0 ? numSpins / hs_triggers : 0,
                         grand_freq: grand_hits > 0 ? numSpins / grand_hits : 0,
+                        avg_jackpot: grand_hits > 0 ? this.jackpotHitTotal / grand_hits : 10000.0,
                         volatility: volatility,
                         num_spins: numSpins,
                         buckets: buckets,
