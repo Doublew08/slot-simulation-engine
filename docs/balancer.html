@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genetic Auto-Balancer | Slot Engine</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="audio-toggle-container">
+        <a href="index.html" class="btn-secondary" style="text-decoration: none; display: inline-block;">⬅️ RETURN TO MAIN ENGINE</a>
+    </div>
+
+    <main class="container">
+        <header class="glass-panel text-center">
+            <h1>GENETIC AUTO-BALANCER</h1>
+            <p>Machine Learning Heuristic Optimization Studio</p>
+        </header>
+
+        <div class="dashboard">
+            <!-- Controls Panel -->
+            <section class="glass-panel controls-panel">
+                <h2>Evolution Parameters</h2>
+                
+                <div class="form-group">
+                    <label for="targetRtp">Target RTP (%)</label>
+                    <input type="number" id="targetRtp" value="96.00" min="50" max="150" step="0.1">
+                    <small>The exact mathematical target you want the engine to reach.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="popSize">Population Size</label>
+                    <input type="number" id="popSize" value="10" min="2" max="50" step="1">
+                    <small>Number of distinct mathematical models bred per generation.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="generations">Generations to Evolve</label>
+                    <input type="number" id="generations" value="10" min="1" max="50" step="1">
+                </div>
+
+                <button id="runEvolveBtn" class="btn-primary">
+                    <span class="btn-text" id="evolveBtnText">INITIATE EVOLUTION</span>
+                    <span class="loader" id="evolveBtnLoader" style="display: none;"></span>
+                </button>
+                
+                <div class="progress-container" id="evolveProgressContainer" style="display: none;">
+                    <div class="progress-bar" id="evolveProgressBar"></div>
+                    <span class="progress-text" id="evolveProgressText">Generation 0 / 10</span>
+                </div>
+            </section>
+
+            <!-- Results Panel -->
+            <section class="glass-panel results-panel">
+                <h2>Evolution Output</h2>
+                
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>Best RTP Achieved</h3>
+                        <p class="metric-value highlight" id="mBestRtp">--%</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Error Delta</h3>
+                        <p class="metric-value" id="mError" style="color: #fbbf24;">--%</p>
+                    </div>
+                    <div class="metric-card">
+                        <h3>Generations Run</h3>
+                        <p class="metric-value" id="mGenCount">--</p>
+                    </div>
+                </div>
+
+                <div class="chart-wrapper-large" style="height: 250px;">
+                    <canvas id="fitnessChart"></canvas>
+                </div>
+
+                <h3 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--primary-color);">Optimized Symbol Weights</h3>
+                <div class="editor-grid" id="optimizedWeightsGrid" style="margin-top: 0;">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="engine.js"></script>
+    <script src="balancer.js"></script>
+</body>
+</html>
