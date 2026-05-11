@@ -237,11 +237,11 @@ class Simulation {
     }
     
     _getRandomCoin() {
-        if (Math.random() < 0.0001) return 500.0; // Major
+        if (Math.random() < 0.0001) return {type: "Major", val: 500.0};
         let choice = this.value_pool[Math.floor(Math.random() * this.value_pool.length)];
-        if (choice === "Mini") return 10.0;
-        if (choice === "Minor") return 50.0;
-        return parseFloat(choice);
+        if (choice === "Mini") return {type: "Mini", val: 10.0};
+        if (choice === "Minor") return {type: "Minor", val: 50.0};
+        return {type: "cash", val: parseFloat(choice)};
     }
     
     run_free_spins() {
@@ -262,34 +262,60 @@ class Simulation {
         return total_payout;
     }
     
-    run_hs(grid) {
+    run_hs(grid, is_bonus_buy = false) {
         let num_rows = grid.length;
         let num_cols = grid[0].length;
         
+        // Determine Strength Level
+        let roll = Math.random();
+        let strength = "Weak";
+        let prob_mult = 0.5;
+        let upgrade_prob = 0.01;
+        
+        if (roll < 0.10) { strength = "Ultra"; prob_mult = 2.0; upgrade_prob = 0.08; }
+        else if (roll < 0.30) { strength = "Strong"; prob_mult = 1.5; upgrade_prob = 0.04; }
+        else if (roll < 0.60) { strength = "Normal"; prob_mult = 1.0; upgrade_prob = 0.02; }
+        
+        let current_prob = this.hs_coin_prob * prob_mult;
+        
         let mask = [];
-        let total_value = 0.0;
         let coin_count = 0;
         
+        // Initial setup
         for (let r = 0; r < num_rows; r++) {
             let row_mask = [];
             for (let c = 0; c < num_cols; c++) {
-                if (grid[r][c] === "CO") {
-                    row_mask.push(true);
+                if (grid[r][c] === "CO" || (is_bonus_buy && Math.random() < 0.4 && coin_count < 6)) {
+                    row_mask.push(this._getRandomCoin());
                     coin_count++;
-                    total_value += this._getRandomCoin();
                 } else {
-                    row_mask.push(false);
+                    row_mask.push(null);
                 }
             }
             mask.push(row_mask);
         }
         
-        if (coin_count < this.hs_trigger_count) {
-            return {triggered: false, payout: 0, grand: false};
+        // Force 6 coins for bonus buy
+        if (is_bonus_buy && coin_count < 6) {
+            let needed = 6 - coin_count;
+            for (let r = 0; r < num_rows && needed > 0; r++) {
+                for (let c = 0; c < num_cols && needed > 0; c++) {
+                    if (mask[r][c] === null) {
+                        mask[r][c] = this._getRandomCoin();
+                        needed--;
+                        coin_count++;
+                    }
+                }
+            }
+        }
+        
+        if (coin_count < this.hs_trigger_count && !is_bonus_buy) {
+            return {triggered: false, payout: 0, grand: false, strength: null, upgrades: 0};
         }
         
         let respins_left = 3;
         let hit_grand = false;
+        let total_upgrades = 0;
         
         while (respins_left > 0) {
             respins_left--;
@@ -297,11 +323,25 @@ class Simulation {
             
             for (let r = 0; r < num_rows; r++) {
                 for (let c = 0; c < num_cols; c++) {
-                    if (!mask[r][c]) {
-                        if (Math.random() < this.hs_coin_prob) {
-                            mask[r][c] = true;
+                    if (mask[r][c] === null) {
+                        if (Math.random() < current_prob) {
+                            mask[r][c] = this._getRandomCoin();
                             new_coin = true;
-                            total_value += this._getRandomCoin();
+                        }
+                    } else {
+                        // Upgrade mechanic
+                        if (Math.random() < upgrade_prob) {
+                            let coin = mask[r][c];
+                            if (coin.type === "cash") {
+                                coin.val *= 2.0; // Double cash
+                                total_upgrades++;
+                            } else if (coin.type === "Mini") {
+                                coin.type = "Minor"; coin.val = 50.0;
+                                total_upgrades++;
+                            } else if (coin.type === "Minor") {
+                                coin.type = "Major"; coin.val = 500.0;
+                                total_upgrades++;
+                            }
                         }
                     }
                 }
@@ -312,19 +352,36 @@ class Simulation {
             let full_screen = true;
             for (let r=0; r<num_rows; r++) {
                 for (let c=0; c<num_cols; c++) {
-                    if (!mask[r][c]) full_screen = false;
+                    if (mask[r][c] === null) full_screen = false;
                 }
             }
+            
             if (full_screen) {
-                total_value += this.globalJackpotPool; // Progressive Award
                 this.jackpotHitTotal += this.globalJackpotPool;
-                this.globalJackpotPool = 10000.0; // Reset network pool
                 hit_grand = true;
                 break;
             }
         }
         
-        return {triggered: true, payout: total_value, grand: hit_grand};
+        // Sum final board
+        let total_value = 0.0;
+        for (let r=0; r<num_rows; r++) {
+            for (let c=0; c<num_cols; c++) {
+                if (mask[r][c] !== null) total_value += mask[r][c].val;
+            }
+        }
+        if (hit_grand) {
+            total_value += this.globalJackpotPool;
+            this.globalJackpotPool = 10000.0; // Reset network pool
+        }
+        
+        return {
+            triggered: true, 
+            payout: total_value, 
+            grand: hit_grand,
+            strength: strength,
+            upgrades: total_upgrades
+        };
     }
     
     run_cascade_spin() {
@@ -381,7 +438,7 @@ class Simulation {
         };
     }
     
-    runSimulation(numSpins, progressCallback) {
+    runSimulation(numSpins, progressCallback, bonusBuyMode = false) {
         let total_spent = 0.0;
         let base_win_total = 0.0;
         let bonus_win_total = 0.0;
@@ -394,6 +451,9 @@ class Simulation {
         
         let sum_win = 0.0;
         let sum_win_sq = 0.0;
+        
+        let strength_counts = {"Weak": 0, "Normal": 0, "Strong": 0, "Ultra": 0};
+        let total_upgrades = 0;
         
         // Buckets
         let buckets = {"0x": 0, "0-1x": 0, "1-5x": 0, "5-15x": 0, "15-50x": 0, "50x+": 0};
@@ -411,33 +471,56 @@ class Simulation {
                 let end = Math.min(spin_idx + chunkSize, numSpins);
                 
                 for (; spin_idx < end; spin_idx++) {
-                    total_spent += this.bet_amount;
-                    current_balance -= this.bet_amount;
-                    this.globalJackpotPool += this.bet_amount * 0.005; // 0.5% contribution to progressive
-                    
                     let spin_total_win = 0.0;
                     
-                    let cascade_res = this.run_cascade_spin();
-                    
-                    let base_spin_win = cascade_res.payout + cascade_res.scatter_payout;
-                    if (base_spin_win > 0) {
-                        base_hits++;
-                        base_win_total += base_spin_win;
-                        spin_total_win += base_spin_win;
-                    }
-                    
-                    if (cascade_res.scatters >= this.bonus_trigger_count) {
-                        bonus_triggers++;
-                        let b_payout = this.run_free_spins();
-                        bonus_win_total += b_payout;
-                        spin_total_win += b_payout;
-                    }
-                    
-                    if (cascade_res.hs_triggered) {
-                        hs_triggers++;
-                        hs_win_total += cascade_res.hs_payout;
-                        spin_total_win += cascade_res.hs_payout;
-                        if (cascade_res.hs_grand) grand_hits++;
+                    if (bonusBuyMode) {
+                        total_spent += this.bet_amount * 100.0;
+                        current_balance -= this.bet_amount * 100.0;
+                        this.globalJackpotPool += (this.bet_amount * 100.0) * 0.005; // Still contribute to progressive
+                        
+                        let mock_grid = [
+                            ["L1", "L2", "H1", "H2", "M1"],
+                            ["M2", "W", "L1", "H1", "H2"],
+                            ["L2", "L1", "W", "M1", "M2"]
+                        ];
+                        let hs_res = this.run_hs(mock_grid, true);
+                        if (hs_res.triggered) {
+                            hs_triggers++;
+                            hs_win_total += hs_res.payout;
+                            spin_total_win += hs_res.payout;
+                            if (hs_res.grand) grand_hits++;
+                            if (hs_res.strength) strength_counts[hs_res.strength]++;
+                            total_upgrades += hs_res.upgrades;
+                        }
+                    } else {
+                        total_spent += this.bet_amount;
+                        current_balance -= this.bet_amount;
+                        this.globalJackpotPool += this.bet_amount * 0.005; // 0.5% contribution to progressive
+                        
+                        let cascade_res = this.run_cascade_spin();
+                        
+                        let base_spin_win = cascade_res.payout + cascade_res.scatter_payout;
+                        if (base_spin_win > 0) {
+                            base_hits++;
+                            base_win_total += base_spin_win;
+                            spin_total_win += base_spin_win;
+                        }
+                        
+                        if (cascade_res.scatters >= this.bonus_trigger_count) {
+                            bonus_triggers++;
+                            let b_payout = this.run_free_spins();
+                            bonus_win_total += b_payout;
+                            spin_total_win += b_payout;
+                        }
+                        
+                        if (cascade_res.hs_triggered) {
+                            hs_triggers++;
+                            hs_win_total += cascade_res.hs_payout;
+                            spin_total_win += cascade_res.hs_payout;
+                            if (cascade_res.hs_grand) grand_hits++;
+                            if (cascade_res.strength) strength_counts[cascade_res.strength]++;
+                            total_upgrades += cascade_res.upgrades;
+                        }
                     }
                     
                     sum_win += spin_total_win;
@@ -494,7 +577,9 @@ class Simulation {
                         volatility: volatility,
                         num_spins: numSpins,
                         buckets: buckets,
-                        balance_history: balance_history
+                        balance_history: balance_history,
+                        strength_counts: strength_counts,
+                        avg_upgrades: hs_triggers > 0 ? total_upgrades / hs_triggers : 0
                     });
                 }
             };
