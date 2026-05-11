@@ -81,9 +81,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- REEL EDITOR & PRESETS LOGIC ---
     const editorGrid = document.getElementById('editorGrid');
     const presets = {
-        low: { "W": 6.0, "H1": 6, "H2": 7, "M1": 8, "M2": 8, "L1": 8, "L2": 8, "SC": 3, "CO": 4 },
-        med: { "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
-        high: { "W": 2.5, "H1": 2, "H2": 3, "M1": 5, "M2": 6, "L1": 15, "L2": 20, "SC": 1.5, "CO": 2 }
+        low: { "W": 2, "H1": 3, "H2": 4, "M1": 5, "M2": 6, "L1": 25, "L2": 30, "SC": 1.5, "CO": 3 },
+        med: { "W": 1, "H1": 2, "H2": 2, "M1": 3, "M2": 3, "L1": 30, "L2": 35, "SC": 1, "CO": 2 },
+        high: { "W": 0.5, "H1": 1, "H2": 1, "M1": 2, "M2": 2, "L1": 40, "L2": 45, "SC": 0.5, "CO": 1 }
     };
     
     function renderEditor(weights) {
