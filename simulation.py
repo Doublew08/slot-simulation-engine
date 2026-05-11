@@ -36,9 +36,20 @@ class SimulationRunner:
         base_hits = 0
         bonus_triggers = 0
         hs_triggers = 0
+        grand_jackpots = 0
         
         sum_win = 0.0
         sum_win_sq = 0.0
+        
+        # Win Buckets
+        buckets = {
+            "0x": 0,
+            ">0x to 1x": 0,
+            ">1x to 5x": 0,
+            ">5x to 15x": 0,
+            ">15x to 50x": 0,
+            ">50x": 0
+        }
         
         for spin_idx in range(num_spins):
             total_spent += self.bet_amount
@@ -69,12 +80,29 @@ class SimulationRunner:
                 triggered, hs_mask, hs_initial_val = self.hold_and_spin_feature.check_trigger(grid)
                 if triggered:
                     hs_triggers += 1
-                    hs_payout, _ = self.hold_and_spin_feature.run_hold_and_spin(hs_mask, hs_initial_val)
+                    hs_payout, _, hit_grand = self.hold_and_spin_feature.run_hold_and_spin(hs_mask, hs_initial_val)
                     hs_win_total += hs_payout
                     spin_total_win += hs_payout
+                    if hit_grand:
+                        grand_jackpots += 1
                     
             sum_win += spin_total_win
             sum_win_sq += spin_total_win * spin_total_win
+            
+            # Track Buckets
+            win_mult = spin_total_win / self.bet_amount
+            if win_mult == 0:
+                buckets["0x"] += 1
+            elif win_mult <= 1.0:
+                buckets[">0x to 1x"] += 1
+            elif win_mult <= 5.0:
+                buckets[">1x to 5x"] += 1
+            elif win_mult <= 15.0:
+                buckets[">5x to 15x"] += 1
+            elif win_mult <= 50.0:
+                buckets[">15x to 50x"] += 1
+            else:
+                buckets[">50x"] += 1
             
             # Print progress every 1 million spins
             if (spin_idx + 1) % 1000000 == 0:
@@ -91,6 +119,7 @@ class SimulationRunner:
         hit_rate = base_hits / num_spins if num_spins > 0 else 0
         bonus_freq = num_spins / bonus_triggers if bonus_triggers > 0 else 0
         hs_freq = num_spins / hs_triggers if hs_triggers > 0 else 0
+        grand_freq = num_spins / grand_jackpots if grand_jackpots > 0 else 0
         
         mean_win = sum_win / num_spins if num_spins > 0 else 0
         variance = (sum_win_sq / num_spins) - (mean_win ** 2) if num_spins > 0 else 0
@@ -105,15 +134,19 @@ class SimulationRunner:
             "Base Hit Rate": hit_rate,
             "Bonus Trigger Frequency (1 in X)": bonus_freq,
             "Hold and Spin Frequency (1 in X)": hs_freq,
+            "Grand Jackpot Frequency (1 in X)": grand_freq,
             "Volatility": volatility
         }
+        
+        for k, v in buckets.items():
+            metrics[f"Bucket: {k} (%)"] = (v / num_spins) * 100
         
         self._export_csv(output_csv, metrics)
         
         print("\n--- Simulation Results ---")
         for k, v in metrics.items():
-            if "RTP" in k or "Rate" in k:
-                print(f"{k}: {v:.2%}")
+            if "RTP" in k or "Rate" in k or "Bucket" in k:
+                print(f"{k}: {v:.2f}%")
             elif "Frequency" in k:
                 print(f"{k}: {v:.1f}")
             else:

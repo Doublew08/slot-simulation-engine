@@ -3,7 +3,7 @@
 class SymbolDef {
     constructor(name, payouts, is_wild = false, is_scatter = false, is_coin = false) {
         this.name = name;
-        this.payouts = payouts; // object like {3: 0.5, 4: 2.0, 5: 10.0}
+        this.payouts = payouts;
         this.is_wild = is_wild;
         this.is_scatter = is_scatter;
         this.is_coin = is_coin;
@@ -41,10 +41,9 @@ class Reel {
         this.symbols = Object.keys(symbol_weights);
         this.weights = Object.values(symbol_weights);
         
-        // Build an array for fast random choices
         this.pool = [];
         for (let i = 0; i < this.symbols.length; i++) {
-            let count = Math.round(this.weights[i] * 100); // Scale floats to ints
+            let count = Math.round(this.weights[i] * 100);
             for (let j = 0; j < count; j++) {
                 this.pool.push(this.symbols[i]);
             }
@@ -165,10 +164,14 @@ class Evaluator {
 class Simulation {
     constructor() {
         this.bet_amount = 1.0;
-        this.setupGame(4.238, 0.05);
+        // Default weights
+        this.defaultWeights = {
+            "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3
+        };
+        this.setupGame(this.defaultWeights, 0.05);
     }
     
-    setupGame(wildWeight, coinProbability) {
+    setupGame(customWeights, coinProbability) {
         let symbols = [
             new SymbolDef("W", {3: 0.5, 4: 2.0, 5: 10.0}, true),
             new SymbolDef("H1", {3: 0.4, 4: 1.5, 5: 5.0}),
@@ -182,17 +185,14 @@ class Simulation {
         ];
         this.paytable = new Paytable(symbols);
         
-        let base_weights = {
-            "W": parseFloat(wildWeight),
-            "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3
-        };
+        let bw = customWeights;
         
         let reels = [
-            new Reel(base_weights),
-            new Reel({...base_weights, "W": base_weights.W * 1.5, "SC": 3, "CO": 4}),
-            new Reel({...base_weights, "H1": 5, "SC": 2, "CO": 5}),
-            new Reel({...base_weights, "W": base_weights.W * 2.0, "SC": 2, "CO": 4}),
-            new Reel({...base_weights, "H2": 6, "SC": 3, "CO": 3})
+            new Reel(bw),
+            new Reel({...bw, "W": bw.W * 1.5, "SC": 3, "CO": 4}),
+            new Reel({...bw, "H1": 5, "SC": 2, "CO": 5}),
+            new Reel({...bw, "W": bw.W * 2.0, "SC": 2, "CO": 4}),
+            new Reel({...bw, "H2": 6, "SC": 3, "CO": 3})
         ];
         
         this.engine = new ReelEngine(reels);
@@ -212,7 +212,23 @@ class Simulation {
         
         this.hs_trigger_count = 6;
         this.hs_coin_prob = parseFloat(coinProbability);
+        
+        // Jackpot pool setup
         this.hs_coin_values = [1.0, 2.0, 3.0, 5.0, 10.0, 50.0];
+        this.value_pool = [];
+        for(let val of this.hs_coin_values) {
+            for(let i=0; i<100; i++) this.value_pool.push(val);
+        }
+        for(let i=0; i<5; i++) this.value_pool.push("Mini");
+        this.value_pool.push("Minor");
+    }
+    
+    _getRandomCoin() {
+        if (Math.random() < 0.0001) return 500.0; // Major
+        let choice = this.value_pool[Math.floor(Math.random() * this.value_pool.length)];
+        if (choice === "Mini") return 10.0;
+        if (choice === "Minor") return 50.0;
+        return parseFloat(choice);
     }
     
     run_free_spins() {
@@ -248,7 +264,7 @@ class Simulation {
                 if (grid[r][c] === "CO") {
                     row_mask.push(true);
                     coin_count++;
-                    total_value += this.hs_coin_values[Math.floor(Math.random() * this.hs_coin_values.length)];
+                    total_value += this._getRandomCoin();
                 } else {
                     row_mask.push(false);
                 }
@@ -257,10 +273,12 @@ class Simulation {
         }
         
         if (coin_count < this.hs_trigger_count) {
-            return {triggered: false, payout: 0};
+            return {triggered: false, payout: 0, grand: false};
         }
         
         let respins_left = 3;
+        let hit_grand = false;
+        
         while (respins_left > 0) {
             respins_left--;
             let new_coin = false;
@@ -271,7 +289,7 @@ class Simulation {
                         if (Math.random() < this.hs_coin_prob) {
                             mask[r][c] = true;
                             new_coin = true;
-                            total_value += this.hs_coin_values[Math.floor(Math.random() * this.hs_coin_values.length)];
+                            total_value += this._getRandomCoin();
                         }
                     }
                 }
@@ -285,10 +303,14 @@ class Simulation {
                     if (!mask[r][c]) full_screen = false;
                 }
             }
-            if (full_screen) break;
+            if (full_screen) {
+                total_value += 5000.0; // Grand
+                hit_grand = true;
+                break;
+            }
         }
         
-        return {triggered: true, payout: total_value};
+        return {triggered: true, payout: total_value, grand: hit_grand};
     }
     
     runSimulation(numSpins, progressCallback) {
@@ -300,13 +322,21 @@ class Simulation {
         let base_hits = 0;
         let bonus_triggers = 0;
         let hs_triggers = 0;
+        let grand_hits = 0;
         
         let sum_win = 0.0;
         let sum_win_sq = 0.0;
         
-        // Chunking the execution so we don't freeze the browser
+        // Buckets
+        let buckets = {"0x": 0, "0-1x": 0, "1-5x": 0, "5-15x": 0, "15-50x": 0, "50x+": 0};
+        
+        // Balance History (Sampled to max 500 points to not crash browser)
+        let sample_rate = Math.max(1, Math.floor(numSpins / 500));
+        let balance_history = [];
+        let current_balance = 0.0;
+        
         let spin_idx = 0;
-        let chunkSize = 50000; 
+        let chunkSize = 20000; 
         
         return new Promise((resolve) => {
             const doChunk = () => {
@@ -314,6 +344,7 @@ class Simulation {
                 
                 for (; spin_idx < end; spin_idx++) {
                     total_spent += this.bet_amount;
+                    current_balance -= this.bet_amount;
                     let spin_total_win = 0.0;
                     
                     let grid = this.engine.spin();
@@ -339,10 +370,25 @@ class Simulation {
                         hs_triggers++;
                         hs_win_total += hs_res.payout;
                         spin_total_win += hs_res.payout;
+                        if (hs_res.grand) grand_hits++;
                     }
                     
                     sum_win += spin_total_win;
                     sum_win_sq += spin_total_win * spin_total_win;
+                    current_balance += spin_total_win;
+                    
+                    // Buckets
+                    let win_mult = spin_total_win / this.bet_amount;
+                    if (win_mult === 0) buckets["0x"]++;
+                    else if (win_mult <= 1.0) buckets["0-1x"]++;
+                    else if (win_mult <= 5.0) buckets["1-5x"]++;
+                    else if (win_mult <= 15.0) buckets["5-15x"]++;
+                    else if (win_mult <= 50.0) buckets["15-50x"]++;
+                    else buckets["50x+"]++;
+                    
+                    if (spin_idx % sample_rate === 0) {
+                        balance_history.push(current_balance);
+                    }
                 }
                 
                 if (progressCallback) {
@@ -350,7 +396,7 @@ class Simulation {
                 }
                 
                 if (spin_idx < numSpins) {
-                    setTimeout(doChunk, 0); // Yield to browser
+                    setTimeout(doChunk, 0);
                 } else {
                     let total_win = base_win_total + bonus_win_total + hs_win_total;
                     let total_rtp = total_win / total_spent;
@@ -363,6 +409,11 @@ class Simulation {
                     let variance = (sum_win_sq / numSpins) - (mean_win * mean_win);
                     let volatility = Math.sqrt(Math.max(0, variance));
                     
+                    // Convert buckets to percentages
+                    for (let key in buckets) {
+                        buckets[key] = (buckets[key] / numSpins) * 100;
+                    }
+                    
                     resolve({
                         total_rtp: total_rtp,
                         base_rtp: base_rtp,
@@ -371,8 +422,11 @@ class Simulation {
                         hit_rate: hit_rate,
                         bonus_freq: bonus_triggers > 0 ? numSpins / bonus_triggers : 0,
                         hs_freq: hs_triggers > 0 ? numSpins / hs_triggers : 0,
+                        grand_freq: grand_hits > 0 ? numSpins / grand_hits : 0,
                         volatility: volatility,
-                        num_spins: numSpins
+                        num_spins: numSpins,
+                        buckets: buckets,
+                        balance_history: balance_history
                     });
                 }
             };
