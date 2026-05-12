@@ -249,10 +249,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!match) return;
         try {
             const cfg = JSON.parse(atob(match[1]));
-            if (cfg.spins)              document.getElementById('numSpins').value   = cfg.spins;
-            if (cfg.coinProb !== undefined) document.getElementById('coinProb').value  = cfg.coinProb;
-            if (cfg.bonusBuy !== undefined) document.getElementById('bonusBuyMode').checked = cfg.bonusBuy;
-            if (cfg.weights)            renderEditor(cfg.weights);
+            const ALLOWED_SYMS = new Set(["W","H1","H2","M1","M2","L1","L2","SC","CO"]);
+            if (Number.isFinite(cfg.spins) && cfg.spins > 0)
+                document.getElementById('numSpins').value = Math.max(1000, Math.min(50_000_000, cfg.spins));
+            if (Number.isFinite(cfg.coinProb))
+                document.getElementById('coinProb').value = Math.max(0, Math.min(1, cfg.coinProb));
+            if (typeof cfg.bonusBuy === 'boolean')
+                document.getElementById('bonusBuyMode').checked = cfg.bonusBuy;
+            if (cfg.weights && typeof cfg.weights === 'object' && !Array.isArray(cfg.weights)) {
+                const safe = {};
+                for (const sym of ALLOWED_SYMS) {
+                    const v = cfg.weights[sym];
+                    if (Number.isFinite(v) && v >= 0) safe[sym] = v;
+                }
+                if (Object.keys(safe).length > 0) renderEditor(safe);
+            }
         } catch (_) {}
     }
 
