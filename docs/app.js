@@ -123,10 +123,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const online = await checkPythonBackend();
             usePythonBackend = online;
             if (!online) {
-                // revert toggle if server unreachable
                 backendPythonBtn.classList.remove('active');
                 backendBrowserBtn.classList.add('active');
                 pythonOptions.style.display = 'none';
+            } else {
+                // Suggest a smaller spin count on the free-tier Render backend
+                const spinInput = document.getElementById('numSpins');
+                if (spinInput && parseInt(spinInput.value) > 200000) {
+                    spinInput.value = 100000;
+                    backendStatus.textContent += ' — spin count capped to 100K (free tier is slow)';
+                }
             }
         });
     }
