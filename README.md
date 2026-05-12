@@ -95,7 +95,7 @@ graph TD
     %% Connections
     UI_Controls -->|Triggers| APP_Loop
     UI_Controls -->|Triggers| APP_Balancer
-    APP_Loop -->|Calls run_cascade_spin()| SIM
+    APP_Loop -->|Calls run_cascade_spin| SIM
     APP_Balancer -->|Mutates Weights| SIM
     SIM -->|Returns Results| APP_Loop
     SIM -->|Instantiates| ENG
