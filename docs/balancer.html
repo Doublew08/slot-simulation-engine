@@ -55,6 +55,12 @@
                     <input type="number" id="generations" value="10" min="1" max="50" step="1">
                 </div>
 
+                <div class="form-group">
+                    <label for="spinsPerTest">Spins per Individual</label>
+                    <input type="number" id="spinsPerTest" value="100000" min="10000" max="1000000" step="10000">
+                    <small>Higher = more accurate fitness, slower evolution.</small>
+                </div>
+
                 <button id="runEvolveBtn" class="btn-primary">
                     <span class="btn-text" id="evolveBtnText">INITIATE EVOLUTION</span>
                     <span class="loader" id="evolveBtnLoader" style="display: none;"></span>
@@ -93,6 +99,9 @@
                 <div class="editor-grid" id="optimizedWeightsGrid" style="margin-top: 0;">
                     <!-- Populated by JS -->
                 </div>
+                <a id="sendToMainBtn" href="index.html" class="btn-primary" style="display:none; margin-top:1.5rem; text-align:center; text-decoration:none;">
+                    🚀 SEND TO MAIN ENGINE
+                </a>
             </section>
         </div>
     </main>
