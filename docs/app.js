@@ -90,11 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function checkPythonBackend() {
         backendStatus.style.display = 'block';
-        backendStatus.textContent   = 'checking...';
+        backendStatus.textContent   = 'waking server (~30s on cold start)...';
         backendStatus.style.color   = '#94a3b8';
         try {
             const res = await fetch(`${PYTHON_API}/api/health`, {
-                signal: AbortSignal.timeout(3000),
+                signal: AbortSignal.timeout(60000),
             });
             if (res.ok) {
                 backendStatus.textContent = 'online — python server.py running';
