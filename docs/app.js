@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 signal: AbortSignal.timeout(60000),
             });
             if (res.ok) {
-                backendStatus.textContent = 'online — python server.py running';
+                backendStatus.textContent = 'online';
                 backendStatus.style.color = 'var(--success-color)';
                 return true;
             }
