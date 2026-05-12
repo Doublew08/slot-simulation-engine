@@ -26,16 +26,16 @@ Built for math designers who need numbers fast, not stories.
 
 | | |
 |---|---|
-| **Monte Carlo runner** | 10M+ spins with Welford online variance (numerically stable) |
-| **Parallel execution** | `multiprocessing.Pool` — near-linear scaling across cores |
-| **Reproducible runs** | Seeded RNG with deterministic per-worker seed derivation |
-| **RTP decomposition** | Base / Bonus / Hold & Spin contributions tracked independently |
-| **Win evaluation** | Lines (20-payline) and Ways (243) evaluators, wild substitution |
-| **Free Spins** | Scatter-triggered, configurable multiplier, retrigger cap |
-| **Hold & Spin** | Reel-weight coin probability, 3 lives, Grand jackpot on full screen |
-| **RTP Tuner** | Binary search converges wild weight to any target RTP |
-| **Web simulator** | In-browser Monte Carlo — no server needed |
-| **40 unit tests** | Full coverage of paytable, evaluators, bonus, and H&S logic |
+| 🎲 **Monte Carlo runner** | 10M+ spins with Welford online variance (numerically stable) |
+| ⚡ **Parallel execution** | `multiprocessing.Pool` — near-linear scaling across cores |
+| 🌱 **Reproducible runs** | Seeded RNG with deterministic per-worker seed derivation |
+| 📊 **RTP decomposition** | Base / Bonus / Hold & Spin contributions tracked independently |
+| 🔍 **Win evaluation** | Lines (20-payline) and Ways (243) evaluators, wild substitution |
+| 🎰 **Free Spins** | Scatter-triggered, configurable multiplier, retrigger cap |
+| 🔒 **Hold & Spin** | Reel-weight coin probability, 3 lives, Grand jackpot on full screen |
+| 🎯 **RTP Tuner** | Binary search converges wild weight to any target RTP |
+| 🌐 **Web simulator** | In-browser Monte Carlo — no server needed |
+| ✅ **40 unit tests** | Full coverage of paytable, evaluators, bonus, and H&S logic |
 
 ---
 
@@ -189,7 +189,7 @@ HoldAndSpinFeature(
 ## Module Reference
 
 <details>
-<summary><strong>reels.py</strong> — Reel and ReelEngine</summary>
+<summary>🎡 <strong>reels.py</strong> — Reel and ReelEngine</summary>
 
 - `Reel(symbol_weights)` — builds a weighted symbol pool, sampled via `random.choices`
 - `spin_column(num_rows)` — returns a list of symbols for one reel position
@@ -199,7 +199,7 @@ HoldAndSpinFeature(
 </details>
 
 <details>
-<summary><strong>evaluator.py</strong> — LinesEvaluator, WaysEvaluator</summary>
+<summary>🔍 <strong>evaluator.py</strong> — LinesEvaluator, WaysEvaluator</summary>
 
 - `LinesEvaluator(paytable, paylines)` — evaluates 20 fixed paylines left-to-right; wilds substitute; scatters break lines
 - `WaysEvaluator(paytable)` — counts matching positions per reel; ways = product across consecutive reels; requires ≥ 3 reels
@@ -209,7 +209,7 @@ HoldAndSpinFeature(
 </details>
 
 <details>
-<summary><strong>bonus.py</strong> — BonusFeature</summary>
+<summary>🎰 <strong>bonus.py</strong> — BonusFeature</summary>
 
 - Triggers when scatter count ≥ `trigger_count`
 - Retrigger adds `num_free_spins` to remaining count; hard-capped at `max_total_spins`
@@ -219,7 +219,7 @@ HoldAndSpinFeature(
 </details>
 
 <details>
-<summary><strong>hold_and_spin.py</strong> — HoldAndSpinFeature</summary>
+<summary>🔒 <strong>hold_and_spin.py</strong> — HoldAndSpinFeature</summary>
 
 - **Two-pass `check_trigger`** — counts coin positions first (no RNG consumed); assigns coin values only after trigger threshold is confirmed
 - Respins call `reel_engine.reels[col].spin_one()` — coin probability is the live reel weight, not a flat override
@@ -230,7 +230,7 @@ HoldAndSpinFeature(
 </details>
 
 <details>
-<summary><strong>simulation.py</strong> — SimulationRunner</summary>
+<summary>⚙️ <strong>simulation.py</strong> — SimulationRunner</summary>
 
 - `run(num_spins, seed, workers)` — dispatches serial or parallel execution
 - `_run_batch()` — inner spin loop; returns raw accumulator dict
@@ -241,7 +241,7 @@ HoldAndSpinFeature(
 </details>
 
 <details>
-<summary><strong>tuner.py</strong></summary>
+<summary>🎯 <strong>tuner.py</strong></summary>
 
 - Binary-searches `wild_weight` across 8 iterations × 100K spins
 - Verifies the converged weight with a 3M-spin confirmation run
