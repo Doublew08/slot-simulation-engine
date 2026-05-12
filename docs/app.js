@@ -6,6 +6,8 @@ let currentSim = null;
 let lastResults = null; 
 let autoSpinInterval = null;
 
+const ALLOWED_SYMS = ["W", "H1", "H2", "M1", "M2", "L1", "L2", "SC", "CO"];
+
 // --- AUDIO ENGINE ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let soundEnabled = true;
