@@ -5,15 +5,6 @@ let sessionHistChartInstance = null;
 let currentSim = null; 
 let lastResults = null; 
 let autoSpinInterval = null;
-let usePythonBackend = false;
-const PYTHON_API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8000'
-    : 'https://slot-simulation-engine.onrender.com';
-
-// Silent warmup — pings Render on page load so server is warm before user clicks Python API
-if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(60000) }).catch(() => {});
-}
 
 // --- AUDIO ENGINE ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -88,53 +79,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- BACKEND TOGGLE ---
-    const backendBrowserBtn = document.getElementById('backendBrowserBtn');
-    const backendPythonBtn  = document.getElementById('backendPythonBtn');
-    const backendStatus     = document.getElementById('backendStatus');
-    const pythonOptions     = document.getElementById('pythonOptions');
-
-    async function checkPythonBackend() {
-        backendStatus.style.display = 'block';
-        backendStatus.textContent   = 'waking server (~30s on cold start)...';
-        backendStatus.style.color   = '#94a3b8';
-        try {
-            const res = await fetch(`${PYTHON_API}/api/health`, {
-                signal: AbortSignal.timeout(60000),
-            });
-            if (res.ok) {
-                backendStatus.textContent = 'online';
-                backendStatus.style.color = 'var(--success-color)';
-                return true;
-            }
-        } catch (_) {}
-        backendStatus.textContent = 'offline — run: python server.py';
-        backendStatus.style.color = '#f50057';
-        return false;
-    }
-
-    if (backendBrowserBtn && backendPythonBtn) {
-        backendBrowserBtn.addEventListener('click', () => {
-            usePythonBackend = false;
-            backendBrowserBtn.classList.add('active');
-            backendPythonBtn.classList.remove('active');
-            pythonOptions.style.display  = 'none';
-            backendStatus.style.display  = 'none';
-        });
-
-        backendPythonBtn.addEventListener('click', async () => {
-            backendPythonBtn.classList.add('active');
-            backendBrowserBtn.classList.remove('active');
-            pythonOptions.style.display = 'block';
-            const online = await checkPythonBackend();
-            usePythonBackend = online;
-            if (!online) {
-                backendPythonBtn.classList.remove('active');
-                backendBrowserBtn.classList.add('active');
-                pythonOptions.style.display = 'none';
-            }
-        });
-    }
-
     // --- REEL EDITOR & PRESETS LOGIC ---
     const editorGrid = document.getElementById('editorGrid');
     const presets = {
@@ -340,43 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderHistory();
 
-    // Fetch simulation from Python backend — plain JSON response (no SSE, proxy-safe).
-    async function runSimulationPython(numSpins, onProgress) {
-        const body = {
-            num_spins:   numSpins,
-            wild_weight: parseFloat(document.getElementById('pyWildWeight')?.value) || 4.238,
-        };
-        const seedVal = document.getElementById('pySeed')?.value;
-        if (seedVal && seedVal.trim() !== '') body.seed = parseInt(seedVal);
-
-        // Animate progress bar while waiting (server gives no streaming progress)
-        let fakePct = 2;
-        onProgress(fakePct);
-        const ticker = setInterval(() => {
-            fakePct = Math.min(fakePct + (90 - fakePct) * 0.04, 90);
-            onProgress(fakePct);
-        }, 1000);
-
-        try {
-            const response = await fetch(`${PYTHON_API}/api/simulate`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify(body),
-            });
-            if (!response.ok) throw new Error(`Server error: ${response.status}`);
-            const result = await response.json();
-            onProgress(100);
-            return result;
-        } finally {
-            clearInterval(ticker);
-        }
-    }
-
-    // Run simulation — dispatches to Python API or JS engine based on toggle.
     function runSimulation(numSpins, coinProb, weights, bonusBuyMode, onProgress) {
-        if (usePythonBackend) {
-            return runSimulationPython(numSpins, onProgress);
-        }
         if (typeof Worker !== 'undefined') {
             return new Promise((resolve, reject) => {
                 const worker = new Worker('simulation.worker.js');

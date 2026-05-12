@@ -30,30 +30,12 @@
 
         <header class="glass-panel text-center">
             <h1>CMA-ES AUTO-BALANCER</h1>
-            <p>Covariance Matrix Adaptation — Browser JS or Python Server</p>
+            <p>Covariance Matrix Adaptation Evolution Strategy — runs in browser, no server needed</p>
         </header>
 
         <div class="dashboard">
             <!-- Controls Panel -->
             <section class="glass-panel controls-panel">
-                <h2>Optimizer Mode</h2>
-
-                <div class="form-group" style="margin-bottom: 1.5rem;">
-                    <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
-                        <button id="modeJsBtn" class="backend-btn active">&#127760; JS CMA-ES</button>
-                        <button id="modePyBtn" class="backend-btn">&#128013; Python CMA-ES</button>
-                    </div>
-                    <small id="modeStatus">Browser CMA-ES — no server required, runs in Web Worker</small>
-                </div>
-
-                <!-- Python-only notice (hidden in JS mode) -->
-                <div id="pyNotice" style="display:none; padding:0.6rem 0.8rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; margin-bottom:1rem; font-size:0.82rem; color:#fcd34d;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.3rem;">
-                        <span>Calls Render backend — may be slow on cold start.</span>
-                        <span id="connStatus" style="font-weight:600; color:#94a3b8;">&#8212;</span>
-                    </div>
-                </div>
-
                 <h2>Parameters</h2>
 
                 <div class="form-group">
