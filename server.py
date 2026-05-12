@@ -66,6 +66,7 @@ def simulate(req: SimulateRequest):
     def run_thread():
         try:
             runner = build_game(req.wild_weight)
+            q.put({"type": "progress", "value": 0.001})  # signal: engine ready, starting
 
             def on_progress(pct: float):
                 q.put({"type": "progress", "value": round(pct, 4)})

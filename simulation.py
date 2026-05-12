@@ -189,6 +189,10 @@ class SimulationRunner:
                 elif mult <= 50.0:     buckets[">15x to 50x"] += 1
                 else:                  buckets[">50x"]        += 1
 
+                # Fine-grained progress every 10K spins (helps slow backends)
+                if progress_cb and spin_idx > 0 and spin_idx % 10_000 == 0:
+                    progress_cb(spin_idx / num_spins)
+
             if verbose and chunk_end % 1_000_000 == 0:
                 print(f"  {chunk_end:,} spins complete...")
             if progress_cb:
