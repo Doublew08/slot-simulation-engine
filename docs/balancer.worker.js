@@ -88,15 +88,22 @@ self.onmessage = function (e) {
         }
 
         // Final estimate: average of last 5 iterates (Polyak-Ruppert)
-        const win   = xHistory.slice(-5);
+        const win    = xHistory.slice(-5);
         const xFinal = win.reduce((a, b) => a + b, 0) / win.length;
 
+        // Verification run — high spins at xFinal to confirm actual RTP
+        const verifySpins = Math.min(500_000, spinsPerEval * 4);
+        const { rtp: verifiedRtp, ci: verifiedCi } = evaluateRtp(xFinal, verifySpins);
+        const verifiedDelta = Math.abs(verifiedRtp - targetRtp);
+
         self.postMessage({
-            type:         'done',
-            wild_weight:  +xFinal.toFixed(4),
-            iters:        xHistory.length,
-            target:       targetRtp,
-            delta:        +bestFitness.toFixed(6),
+            type:          'done',
+            wild_weight:   +xFinal.toFixed(4),
+            iters:         xHistory.length,
+            target:        targetRtp,
+            verified_rtp:  +verifiedRtp.toFixed(6),
+            verified_ci:   +verifiedCi.toFixed(6),
+            delta:         +verifiedDelta.toFixed(6),
         });
 
     } catch (err) {
