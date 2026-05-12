@@ -80,102 +80,129 @@ class SimulationRunner:
         """
         Inner spin loop. Returns raw accumulator dict suitable for merging.
         Does NOT set random seed — caller is responsible.
-        """
-        base_win = 0.0
-        bonus_win = 0.0
-        hs_win = 0.0
-        base_hits = 0
-        bonus_triggers = 0
-        hs_triggers = 0
-        grand_jackpots = 0
 
-        # Welford's online variance
-        welf_n = 0
-        welf_mean = 0.0
-        welf_M2 = 0.0
+        Optimisations vs naïve loop:
+        - All self.* attributes cached as locals before the loop (avoids
+          repeated __getattr__ / dict lookup inside the hot path).
+        - Base-game spins pre-generated in chunks of CHUNK using one
+          random.choices(k=CHUNK*rows) call per reel instead of one call
+          per spin — reduces Python→C transitions by ~1000×.
+        """
+        # ── Local aliases ────────────────────────────────────────────────
+        reels         = self.reel_engine.reels
+        num_rows      = self.reel_engine.num_rows
+        num_cols      = len(reels)
+        evaluate      = self.evaluator.evaluate
+        eval_scatters = self.evaluator.evaluate_scatters
+        bonus         = self.bonus_feature
+        hs            = self.hold_and_spin_feature
+        exclusive     = self.exclusive_features
+        bet           = self.bet_amount
+
+        bonus_check   = bonus.check_trigger              if bonus else None
+        bonus_run     = (lambda re, ev: bonus.run_free_spins(re, ev)) if bonus else None
+        hs_check      = hs.check_trigger                 if hs    else None
+        hs_run        = hs.run_hold_and_spin             if hs    else None
+        reel_engine   = self.reel_engine
+
+        # ── Accumulators ─────────────────────────────────────────────────
+        base_win = bonus_win = hs_win = 0.0
+        base_hits = bonus_triggers = hs_triggers = grand_jackpots = 0
+        welf_n = 0; welf_mean = 0.0; welf_M2 = 0.0
 
         buckets: Dict[str, int] = {
             "0x": 0, ">0x to 1x": 0, ">1x to 5x": 0,
             ">5x to 15x": 0, ">15x to 50x": 0, ">50x": 0,
         }
-        bet = self.bet_amount
 
-        for spin_idx in range(num_spins):
-            spin_win = 0.0
+        # ── Chunked batch RNG ─────────────────────────────────────────────
+        # Pre-generate base-game spins CHUNK at a time.  One big
+        # random.choices(k=CHUNK×rows) per reel instead of CHUNK small calls.
+        CHUNK = 100_000
+        global_idx = 0
 
-            grid = self.reel_engine.spin()
+        for chunk_start in range(0, num_spins, CHUNK):
+            chunk_end = min(chunk_start + CHUNK, num_spins)
+            chunk_n   = chunk_end - chunk_start
 
-            # Base game
-            bp, _ = self.evaluator.evaluate(grid)
-            sc_count, sc_pay = self.evaluator.evaluate_scatters(grid)
-            bsw = (bp + sc_pay) * bet
-            if bsw > 0:
-                base_hits += 1
-                base_win += bsw
-                spin_win += bsw
+            # 5 bulk calls generate chunk_n full grids worth of symbols
+            all_cols = [
+                random.choices(reel.symbols, weights=reel.weights, k=chunk_n * num_rows)
+                for reel in reels
+            ]
 
-            # Bonus feature
-            bonus_fired = False
-            if self.bonus_feature and self.bonus_feature.check_trigger(sc_count):
-                bonus_fired = True
-                bonus_triggers += 1
-                raw, _ = self.bonus_feature.run_free_spins(self.reel_engine, self.evaluator)
-                bw = raw * bet
-                bonus_win += bw
-                spin_win += bw
+            for i in range(chunk_n):
+                spin_idx = chunk_start + i
+                off      = i * num_rows
+                grid     = [
+                    [all_cols[c][off + r] for c in range(num_cols)]
+                    for r in range(num_rows)
+                ]
 
-            # Hold and Spin
-            if self.hold_and_spin_feature:
-                if not self.exclusive_features or not bonus_fired:
-                    triggered, hs_mask, hs_init = self.hold_and_spin_feature.check_trigger(grid)
+                spin_win = 0.0
+
+                # Base game
+                bp, _          = evaluate(grid)
+                sc_count, sc_pay = eval_scatters(grid)
+                bsw = (bp + sc_pay) * bet
+                if bsw > 0:
+                    base_hits += 1
+                    base_win  += bsw
+                    spin_win  += bsw
+
+                # Bonus feature
+                bonus_fired = False
+                if bonus and bonus_check(sc_count):
+                    bonus_fired    = True
+                    bonus_triggers += 1
+                    raw, _  = bonus_run(reel_engine, self.evaluator)
+                    bw      = raw * bet
+                    bonus_win += bw
+                    spin_win  += bw
+
+                # Hold and Spin
+                if hs and (not exclusive or not bonus_fired):
+                    triggered, hs_mask, hs_init = hs_check(grid)
                     if triggered:
                         hs_triggers += 1
-                        raw_hs, _, hit_grand = self.hold_and_spin_feature.run_hold_and_spin(
-                            hs_mask, hs_init
-                        )
+                        raw_hs, _, hit_grand = hs_run(hs_mask, hs_init)
                         hw = raw_hs * bet
-                        hs_win += hw
+                        hs_win   += hw
                         spin_win += hw
                         if hit_grand:
                             grand_jackpots += 1
 
-            # Welford update
-            welf_n += 1
-            delta = spin_win - welf_mean
-            welf_mean += delta / welf_n
-            welf_M2 += delta * (spin_win - welf_mean)
+                # Welford online variance
+                welf_n  += 1
+                delta    = spin_win - welf_mean
+                welf_mean += delta / welf_n
+                welf_M2  += delta * (spin_win - welf_mean)
 
-            # Win bucket
-            mult = spin_win / bet
-            if mult == 0:
-                buckets["0x"] += 1
-            elif mult <= 1.0:
-                buckets[">0x to 1x"] += 1
-            elif mult <= 5.0:
-                buckets[">1x to 5x"] += 1
-            elif mult <= 15.0:
-                buckets[">5x to 15x"] += 1
-            elif mult <= 50.0:
-                buckets[">15x to 50x"] += 1
-            else:
-                buckets[">50x"] += 1
+                # Win bucket
+                mult = spin_win / bet
+                if mult == 0:          buckets["0x"]         += 1
+                elif mult <= 1.0:      buckets[">0x to 1x"]  += 1
+                elif mult <= 5.0:      buckets[">1x to 5x"]  += 1
+                elif mult <= 15.0:     buckets[">5x to 15x"] += 1
+                elif mult <= 50.0:     buckets[">15x to 50x"] += 1
+                else:                  buckets[">50x"]        += 1
 
-            if verbose and (spin_idx + 1) % 1_000_000 == 0:
-                print(f"  {spin_idx + 1:,} spins complete...")
+            if verbose and chunk_end % 1_000_000 == 0:
+                print(f"  {chunk_end:,} spins complete...")
 
         return {
-            "num_spins": num_spins,
-            "base_win": base_win,
-            "bonus_win": bonus_win,
-            "hs_win": hs_win,
-            "base_hits": base_hits,
-            "bonus_triggers": bonus_triggers,
-            "hs_triggers": hs_triggers,
-            "grand_jackpots": grand_jackpots,
-            "welf_n": welf_n,
-            "welf_mean": welf_mean,
-            "welf_M2": welf_M2,
-            "buckets": buckets,
+            "num_spins":       num_spins,
+            "base_win":        base_win,
+            "bonus_win":       bonus_win,
+            "hs_win":          hs_win,
+            "base_hits":       base_hits,
+            "bonus_triggers":  bonus_triggers,
+            "hs_triggers":     hs_triggers,
+            "grand_jackpots":  grand_jackpots,
+            "welf_n":          welf_n,
+            "welf_mean":       welf_mean,
+            "welf_M2":         welf_M2,
+            "buckets":         buckets,
         }
 
     # ── Parallel orchestration ────────────────────────────────────────────────
