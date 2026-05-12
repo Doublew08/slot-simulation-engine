@@ -8,9 +8,9 @@ Usage:
 Opens http://localhost:8000 automatically.
 API docs at http://localhost:8000/api/docs
 """
+import asyncio
 import json
 import os
-import queue
 import sys
 import threading
 import webbrowser
@@ -36,6 +36,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
+
 
 class SimulateRequest(BaseModel):
     num_spins: int = 1_000_000
@@ -60,16 +62,19 @@ def health():
 
 
 @app.post("/api/simulate")
-def simulate(req: SimulateRequest):
-    q: queue.Queue = queue.Queue()
+async def simulate(req: SimulateRequest):
+    loop = asyncio.get_event_loop()
+    aq: asyncio.Queue = asyncio.Queue()
 
     def run_thread():
         try:
             runner = build_game(req.wild_weight)
-            q.put({"type": "progress", "value": 0.001})  # signal: engine ready, starting
+            loop.call_soon_threadsafe(aq.put_nowait, {"type": "progress", "value": 0.001})
 
             def on_progress(pct: float):
-                q.put({"type": "progress", "value": round(pct, 4)})
+                loop.call_soon_threadsafe(
+                    aq.put_nowait, {"type": "progress", "value": round(pct, 4)}
+                )
 
             metrics = runner.run(
                 num_spins=req.num_spins,
@@ -79,7 +84,6 @@ def simulate(req: SimulateRequest):
                 progress_cb=on_progress if req.workers == 1 else None,
             )
 
-            # Map "Bucket: 0x (%)" → "0x"
             buckets = {}
             for k, v in metrics.items():
                 if k.startswith("Bucket: "):
@@ -101,40 +105,37 @@ def simulate(req: SimulateRequest):
                 "avg_bonus_win":   metrics["Avg Bonus Win"],
                 "avg_hs_win":      metrics["Avg Hold and Spin Win"],
                 "buckets":         buckets,
-                "balance_history": [],   # random walk not tracked in Python engine
+                "balance_history": [],
                 "strength_counts": None,
                 "avg_upgrades":    None,
                 "avg_jackpot":     None,
                 "backend":         "python",
             }
-            q.put({"type": "done", "result": result})
+            loop.call_soon_threadsafe(aq.put_nowait, {"type": "done", "result": result})
 
         except Exception as exc:
-            q.put({"type": "error", "message": str(exc)})
+            loop.call_soon_threadsafe(aq.put_nowait, {"type": "error", "message": str(exc)})
 
     threading.Thread(target=run_thread, daemon=True).start()
 
-    def stream():
+    async def stream():
         while True:
             try:
-                msg = q.get(timeout=15)
-            except queue.Empty:
-                yield ": keep-alive\n\n"  # prevent proxy timeout
+                msg = await asyncio.wait_for(aq.get(), timeout=20)
+            except asyncio.TimeoutError:
+                yield ": keep-alive\n\n"
                 continue
             yield _sse(msg)
             if msg["type"] in ("done", "error"):
                 break
 
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
-    )
+    return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 @app.post("/api/tune")
-def tune(req: TuneRequest):
-    q: queue.Queue = queue.Queue()
+async def tune(req: TuneRequest):
+    loop = asyncio.get_event_loop()
+    aq: asyncio.Queue = asyncio.Queue()
 
     def run_thread():
         try:
@@ -146,7 +147,7 @@ def tune(req: TuneRequest):
             for i in range(req.iterations):
                 mid_w = (low_w + high_w) / 2.0
                 rtp = evaluate_rtp(mid_w, num_spins=req.spins_per_iter)
-                q.put({
+                loop.call_soon_threadsafe(aq.put_nowait, {
                     "type":      "progress",
                     "iteration": i + 1,
                     "total":     req.iterations,
@@ -160,9 +161,9 @@ def tune(req: TuneRequest):
                     high_w = mid_w
                 best_w = mid_w
 
-            q.put({"type": "verifying", "weight": round(best_w, 4)})
+            loop.call_soon_threadsafe(aq.put_nowait, {"type": "verifying", "weight": round(best_w, 4)})
             final_rtp = evaluate_rtp(best_w, num_spins=3_000_000)
-            q.put({
+            loop.call_soon_threadsafe(aq.put_nowait, {
                 "type":   "done",
                 "weight": round(best_w, 4),
                 "rtp":    round(final_rtp, 6),
@@ -171,26 +172,22 @@ def tune(req: TuneRequest):
             })
 
         except Exception as exc:
-            q.put({"type": "error", "message": str(exc)})
+            loop.call_soon_threadsafe(aq.put_nowait, {"type": "error", "message": str(exc)})
 
     threading.Thread(target=run_thread, daemon=True).start()
 
-    def stream():
+    async def stream():
         while True:
             try:
-                msg = q.get(timeout=15)
-            except queue.Empty:
+                msg = await asyncio.wait_for(aq.get(), timeout=20)
+            except asyncio.TimeoutError:
                 yield ": keep-alive\n\n"
                 continue
             yield _sse(msg)
             if msg["type"] in ("done", "error"):
                 break
 
-    return StreamingResponse(
-        stream(),
-        media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
-    )
+    return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)
 
 
 # Static frontend — mount last so API routes take priority
