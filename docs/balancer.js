@@ -110,7 +110,8 @@ function updateMetrics(rtp, error, wildWeight) {
 
 function wireSendToMain(wildWeight) {
     const weights = { ...DEFAULT_WEIGHTS, W: wildWeight };
-    const config  = { spins: 1_000_000, coinProb: 0.05, bonusBuy: false, weights };
+    // Only send weights + autorun — do NOT override main engine's spin count or coin prob
+    const config  = { weights, autorun: true };
     const encoded = encodeURIComponent(btoa(JSON.stringify(config)));
     const btn     = document.getElementById('sendToMainBtn');
     btn.href      = `index.html#sim=${encoded}`;
