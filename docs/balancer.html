@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CMA-ES Auto-Balancer | Slot Engine</title>
+    <title>RTP Auto-Balancer | Slot Engine</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
     <!-- Google Fonts -->
@@ -29,8 +29,8 @@
         </div>
 
         <header class="glass-panel text-center">
-            <h1>CMA-ES AUTO-BALANCER</h1>
-            <p>Covariance Matrix Adaptation Evolution Strategy — runs in browser, no server needed</p>
+            <h1>RTP AUTO-BALANCER</h1>
+            <p>Robbins-Monro stochastic approximation — tunes wild symbol weight in-browser, no server needed</p>
         </header>
 
         <div class="dashboard">
@@ -45,15 +45,15 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="maxEvals">Max Evaluations</label>
-                    <input type="number" id="maxEvals" value="150" min="10" max="500" step="10">
-                    <small>Total CMA-ES function evaluations (budget).</small>
+                    <label for="maxIter">Max Iterations</label>
+                    <input type="number" id="maxIter" value="30" min="5" max="100" step="5">
+                    <small>Stochastic approximation iterations. 20–40 typically sufficient.</small>
                 </div>
 
                 <div class="form-group">
-                    <label for="spinsPerEval">Spins per Evaluation</label>
-                    <input type="number" id="spinsPerEval" value="200000" min="50000" max="1000000" step="50000">
-                    <small>High-volatility game — use 200K+ for reliable convergence. Each eval runs 2x and averages to reduce jackpot variance.</small>
+                    <label for="spinsPerEval">Spins per Iteration</label>
+                    <input type="number" id="spinsPerEval" value="100000" min="50000" max="1000000" step="50000">
+                    <small>More spins → more reliable RTP estimate per step. 100K+ recommended.</small>
                 </div>
 
                 <button id="runEvolveBtn" class="btn-primary">
@@ -73,7 +73,7 @@
 
                 <div class="metrics-grid">
                     <div class="metric-card">
-                        <h3>Best RTP Achieved</h3>
+                        <h3>Current RTP</h3>
                         <p class="metric-value highlight" id="mBestRtp">--%</p>
                     </div>
                     <div class="metric-card">
@@ -81,7 +81,7 @@
                         <p class="metric-value" id="mError" style="color: #fbbf24;">--%</p>
                     </div>
                     <div class="metric-card">
-                        <h3 id="mGenLabel">Evaluations</h3>
+                        <h3>Wild Weight</h3>
                         <p class="metric-value" id="mGenCount">--</p>
                     </div>
                 </div>
@@ -90,10 +90,6 @@
                     <canvas id="fitnessChart"></canvas>
                 </div>
 
-                <h3 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--primary-color);">Optimized Symbol Weights</h3>
-                <div class="editor-grid" id="optimizedWeightsGrid" style="margin-top: 0;">
-                    <!-- Populated by JS -->
-                </div>
                 <a id="sendToMainBtn" href="index.html" class="btn-primary" style="display:none; margin-top:1.5rem; text-align:center; text-decoration:none;">
                     &#128640; SEND TO MAIN ENGINE
                 </a>
