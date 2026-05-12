@@ -14,7 +14,9 @@ import os
 import sys
 import threading
 import webbrowser
-from typing import Optional
+from typing import Annotated, Optional
+
+from pydantic import Field
 
 import uvicorn
 from fastapi import FastAPI
@@ -40,10 +42,10 @@ SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
 
 
 class SimulateRequest(BaseModel):
-    num_spins: int = 1_000_000
-    seed: Optional[int] = None
-    workers: int = 1
-    wild_weight: float = 4.238
+    num_spins:   Annotated[int,   Field(ge=1, le=10_000_000)] = 1_000_000
+    seed:        Optional[int]  = None
+    workers:     int            = 1
+    wild_weight: Annotated[float, Field(gt=0, le=50.0)]      = 4.238
 
 
 class TuneRequest(BaseModel):
