@@ -102,18 +102,15 @@ function setProgress(pct, text) {
     document.getElementById('evolveProgressText').innerText  = text;
 }
 
-function updateMetrics(rtp, error, wildWeight) {
+function updateMetrics(rtp, error, payScale) {
     document.getElementById('mBestRtp').innerText  = (rtp   * 100).toFixed(4) + '%';
     document.getElementById('mError').innerText    = (error * 100).toFixed(4) + '%';
-    document.getElementById('mGenCount').innerText = Number(wildWeight).toFixed(4);
+    document.getElementById('mGenCount').innerText = Number(payScale).toFixed(4) + 'x';
 }
 
-function wireSendToMain(wildWeight) {
-    const weights = { ...DEFAULT_WEIGHTS, W: wildWeight };
-    // coinProb MUST match what the balancer optimized at (0.05) — otherwise
-    // H&S RTP differs and main engine shows a different total RTP.
-    // spins deliberately omitted — main engine keeps whatever user set.
-    const config  = { weights, coinProb: 0.05, autorun: true };
+function wireSendToMain(payScale) {
+    // Encode payScale so main engine applies the scaled paytable
+    const config  = { payScale, coinProb: 0.05, autorun: true };
     const encoded = encodeURIComponent(btoa(JSON.stringify(config)));
     const btn     = document.getElementById('sendToMainBtn');
     btn.href      = `index.html#sim=${encoded}`;

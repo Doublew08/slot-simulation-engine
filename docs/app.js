@@ -89,8 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
         high: { "W": 0.5, "H1": 1, "H2": 1, "M1": 2, "M2": 2, "L1": 40, "L2": 45, "SC": 0.5, "CO": 1 }
     };
     
-    const ALLOWED_SYMS = ["W","H1","H2","M1","M2","L1","L2","SC","CO"];
-
     function renderEditor(weights) {
         editorGrid.innerHTML = '';
         for (const sym of ALLOWED_SYMS) {
@@ -144,17 +142,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const ptBody = document.querySelector('#paytableTable tbody');
         ptBody.innerHTML = '';
         
-        const symsToDisplay = ["W", "H1", "H2", "M1", "M2", "L1", "L2", "SC", "CO"];
-        symsToDisplay.forEach(symName => {
+        ALLOWED_SYMS.forEach(symName => {
             let symDef = currentSim.paytable.get(symName);
             let p3 = symDef.payouts[3] || 0;
             let p4 = symDef.payouts[4] || 0;
             let p5 = symDef.payouts[5] || 0;
-            
+
             if(symDef.is_scatter) { p3 += " (Total Bet)"; p4 += " (Total Bet)"; p5 += " (Total Bet)"; }
             if(symDef.is_coin) { p3 = "Jackpot"; p4 = "Jackpot"; p5 = "Jackpot"; }
             if(symName === "W") { p3 += " / Wild"; p4 += " / Wild"; p5 += " / Wild"; }
-            
+
             ptBody.innerHTML += `<tr>
                 <td style="color: var(--primary-color); font-weight: bold;">${symName}</td>
                 <td>${p3}</td><td>${p4}</td><td>${p5}</td>
@@ -164,8 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Render Reel Strips
         const reelsBody = document.querySelector('#reelsTable tbody');
         reelsBody.innerHTML = '';
-        
-        symsToDisplay.forEach(symName => {
+
+        ALLOWED_SYMS.forEach(symName => {
             let rowHtml = `<tr><td style="color: var(--success-color); font-weight: bold;">${symName}</td>`;
             currentSim.engine.reels.forEach(reel => {
                 let count = reel.pool.filter(s => s === symName).length;
@@ -227,11 +224,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (Object.keys(safe).length > 0) renderEditor(safe);
             }
+            // payScale from the auto-balancer: scale all paytable values proportionally
+            if (Number.isFinite(cfg.payScale) && cfg.payScale > 0) {
+                window._balancerPayScale = Math.max(0.05, Math.min(2.0, cfg.payScale));
+            }
             // Auto-run if the link came from the balancer (autorun flag)
             if (cfg.autorun === true) {
                 setTimeout(() => runBtn.click(), 150);
+                const label = window._balancerPayScale
+                    ? `⚖️ Pay scale ${window._balancerPayScale.toFixed(3)}x applied — running simulation…`
+                    : '⚖️ Balancer config loaded — running simulation…';
                 const toast = document.createElement('div');
-                toast.textContent = '⚖️ Balancer weights loaded — running simulation…';
+                toast.textContent = label;
                 toast.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:0.7rem 1.4rem;border-radius:10px;border:1px solid rgba(139,92,246,0.4);font-family:Space Grotesk,sans-serif;font-size:0.9rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 4000);
@@ -305,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     renderHistory();
 
-    function runSimulation(numSpins, coinProb, weights, bonusBuyMode, onProgress) {
+    function runSimulation(numSpins, coinProb, weights, bonusBuyMode, onProgress, payScale) {
         if (typeof Worker !== 'undefined') {
             return new Promise((resolve, reject) => {
                 const worker = new Worker('simulation.worker.js');
@@ -318,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 };
                 worker.onerror = (err) => { worker.terminate(); reject(err); };
-                worker.postMessage({ type: 'run', payload: { numSpins, coinProb, weights, bonusBuyMode } });
+                worker.postMessage({ type: 'run', payload: { numSpins, coinProb, weights, bonusBuyMode, payScale: payScale || null } });
             });
         }
         // Fallback: run on main thread
@@ -345,12 +349,38 @@ document.addEventListener('DOMContentLoaded', () => {
         // Keep currentSim on main thread for visual spin / documentation
         currentSim = new Simulation();
         currentSim.setupGame(weights, coinProb);
+        // Apply pay scale from auto-balancer if present
+        if (window._balancerPayScale && window._balancerPayScale !== 1.0) {
+            const ps = window._balancerPayScale;
+            const BASE_PAYS = {
+                W:  { 3: 0.22,  4: 0.88,  5: 3.50 },
+                H1: { 3: 0.18,  4: 0.66,  5: 1.75 },
+                H2: { 3: 0.13,  4: 0.44,  5: 1.30 },
+                M1: { 3: 0.09,  4: 0.35,  5: 0.88 },
+                M2: { 3: 0.09,  4: 0.26,  5: 0.70 },
+                L1: { 3: 0.044, 4: 0.18,  5: 0.44 },
+                L2: { 3: 0.044, 4: 0.13,  5: 0.35 },
+                SC: { 3: 1.0,   4: 4.0,   5: 20.0 },
+            };
+            const scaledDefs = [
+                new SymbolDef("W",  { 3: BASE_PAYS.W[3]  * ps, 4: BASE_PAYS.W[4]  * ps, 5: BASE_PAYS.W[5]  * ps }, true),
+                new SymbolDef("H1", { 3: BASE_PAYS.H1[3] * ps, 4: BASE_PAYS.H1[4] * ps, 5: BASE_PAYS.H1[5] * ps }),
+                new SymbolDef("H2", { 3: BASE_PAYS.H2[3] * ps, 4: BASE_PAYS.H2[4] * ps, 5: BASE_PAYS.H2[5] * ps }),
+                new SymbolDef("M1", { 3: BASE_PAYS.M1[3] * ps, 4: BASE_PAYS.M1[4] * ps, 5: BASE_PAYS.M1[5] * ps }),
+                new SymbolDef("M2", { 3: BASE_PAYS.M2[3] * ps, 4: BASE_PAYS.M2[4] * ps, 5: BASE_PAYS.M2[5] * ps }),
+                new SymbolDef("L1", { 3: BASE_PAYS.L1[3] * ps, 4: BASE_PAYS.L1[4] * ps, 5: BASE_PAYS.L1[5] * ps }),
+                new SymbolDef("L2", { 3: BASE_PAYS.L2[3] * ps, 4: BASE_PAYS.L2[4] * ps, 5: BASE_PAYS.L2[5] * ps }),
+                new SymbolDef("SC", { 3: BASE_PAYS.SC[3] * ps, 4: BASE_PAYS.SC[4] * ps, 5: BASE_PAYS.SC[5] * ps }, false, true),
+                new SymbolDef("CO", {}, false, false, true)
+            ];
+            currentSim.paytable = new Paytable(scaledDefs);
+        }
         updateDocumentation();
 
         lastResults = await runSimulation(numSpins, coinProb, weights, bonusBuyMode, (percent) => {
             progressBar.style.width = `${percent}%`;
             progressText.innerText = `${percent.toFixed(1)}%`;
-        });
+        }, window._balancerPayScale || null);
 
         runBtn.disabled = false;
         btnText.style.display = 'block';
