@@ -417,3 +417,148 @@ small { display: block; margin-top: 0.5rem; color: #64748b; font-size: 0.8rem; }
 .cyber-table td {
     border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0.5rem;
 }
+
+/* ── Touch targets ───────────────────────────────────────────────────── */
+button, a, input, select {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Phone (≤ 640px) ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+
+    /* Container */
+    .container { padding: 0.875rem; }
+
+    /* Header */
+    header.glass-panel { padding: 1.25rem 1rem; }
+    header h1 { font-size: 1.9rem; letter-spacing: -0.5px; }
+    header p { font-size: 0.82rem; }
+
+    /* Glass panels */
+    .glass-panel {
+        padding: 1.125rem;
+        border-radius: 16px;
+        margin-bottom: 1rem;
+    }
+
+    /* h2 */
+    h2 { font-size: 1.15rem; margin-bottom: 0.875rem; }
+
+    /* ── Tabs: horizontal scroll strip ── */
+    .tabs {
+        justify-content: flex-start;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        padding-bottom: 4px;
+        gap: 0.4rem;
+        /* fade hint on right edge */
+        -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
+        mask-image: linear-gradient(to right, black 80%, transparent 100%);
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 0.55rem 1rem;
+        font-size: 0.82rem;
+        border-radius: 10px;
+        min-height: 44px;
+    }
+
+    /* ── Top controls bar ── */
+    .top-controls-bar {
+        flex-wrap: wrap !important;
+        justify-content: center !important;
+        gap: 0.5rem !important;
+        margin-bottom: 0.75rem !important;
+    }
+
+    /* ── Metrics grid: 2-col ── */
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.625rem;
+        margin-bottom: 1rem;
+    }
+    .metric-card { padding: 0.875rem 0.75rem; }
+    .metric-card h3 { font-size: 0.72rem; }
+    .metric-value { font-size: 1.05rem; }
+
+    /* ── Dashboard + inline-style overrides ── */
+    .dashboard {
+        grid-template-columns: 1fr !important;
+        gap: 1rem;
+    }
+
+    /* ── Charts ── */
+    .charts-row {
+        grid-template-columns: 1fr !important;
+        height: auto;
+        gap: 0.75rem;
+    }
+    .chart-wrapper { height: 210px; }
+    .chart-wrapper-large { height: 190px; margin-top: 0.875rem; }
+
+    /* ── Slot machine ── */
+    .slot-machine {
+        padding: 10px;
+        margin: 0.875rem auto;
+        border-radius: 12px;
+    }
+    .slot-grid { gap: 5px; padding: 5px; }
+    .slot-cell {
+        height: 62px;
+        font-size: 1.15rem;
+        border-radius: 6px;
+    }
+    .win-display { font-size: 1.75rem; margin-top: 0.875rem; }
+
+    /* ── Spin controls ── */
+    .spin-controls {
+        max-width: 100% !important;
+        flex-wrap: wrap;
+        gap: 0.5rem !important;
+    }
+    .spin-controls button { min-height: 44px; }
+
+    /* ── Preset buttons ── */
+    .preset-buttons { flex-wrap: wrap; gap: 0.5rem; }
+    .btn-preset {
+        flex: 1;
+        min-width: 80px;
+        font-size: 0.82rem;
+        min-height: 40px;
+    }
+
+    /* ── Reel editor ── */
+    .editor-grid {
+        grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+        gap: 0.5rem;
+    }
+    .editor-card { padding: 0.75rem; }
+    .editor-card input { font-size: 0.95rem; padding: 0.5rem; }
+
+    /* ── Tables ── */
+    .cyber-table { font-size: 0.78rem; }
+    .cyber-table th,
+    .cyber-table td { padding: 0.35rem 0.3rem; }
+
+    /* ── Inputs — bigger touch targets ── */
+    input[type="number"],
+    input[type="text"] {
+        font-size: 1rem;
+        padding: 0.875rem 1rem;
+        min-height: 48px;
+    }
+    input[type="checkbox"] { width: 22px; height: 22px; }
+
+    /* ── Buttons ── */
+    .btn-primary { min-height: 50px; font-size: 1rem; }
+    .btn-secondary { min-height: 44px; font-size: 0.9rem; padding: 0.75rem 1rem; }
+
+    /* ── Orbs: smaller for perf ── */
+    .orb-1 { width: 220px; height: 220px; }
+    .orb-2 { width: 280px; height: 280px; }
+    .orb-3 { width: 180px; height: 180px; }
+}
