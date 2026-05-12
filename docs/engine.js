@@ -40,21 +40,28 @@ class Reel {
     constructor(symbol_weights) {
         this.symbols = Object.keys(symbol_weights);
         this.weights = Object.values(symbol_weights);
-        
-        this.pool = [];
+
+        // Build Uint8Array index pool — 1 byte per slot vs 8+ for a string ref.
+        // Fits in L1 cache; random access is branch-free integer lookup.
+        let totalSlots = 0;
+        for (let w of this.weights) totalSlots += Math.round(w * 100);
+        this._pool = new Uint8Array(totalSlots);
+        this._poolSize = totalSlots;
+        let pos = 0;
         for (let i = 0; i < this.symbols.length; i++) {
             let count = Math.round(this.weights[i] * 100);
-            for (let j = 0; j < count; j++) {
-                this.pool.push(this.symbols[i]);
-            }
+            this._pool.fill(i, pos, pos + count);
+            pos += count;
         }
+        // Keep plain string pool for legacy/documentation use
+        this.pool = Array.from(this._pool).map(i => this.symbols[i]);
     }
 
     spin_column(num_rows) {
-        let col = [];
+        let col = new Array(num_rows);
+        const pool = this._pool, size = this._poolSize, syms = this.symbols;
         for (let i = 0; i < num_rows; i++) {
-            let idx = Math.floor(Math.random() * this.pool.length);
-            col.push(this.pool[idx]);
+            col[i] = syms[pool[Math.floor(Math.random() * size)]];
         }
         return col;
     }
@@ -430,10 +437,17 @@ class Simulation {
             }
         }
 
-        // H&S only fires on base game spins, not inside free spins
-        let hs_res = allow_hs
-            ? this.run_hs(grid)
-            : {triggered: false, payout: 0, grand: false, strength: null, upgrades: 0};
+        // H&S only fires on base game spins. Pre-count coins to avoid running
+        // the full run_hs() setup on the ~99.98% of spins that don't trigger.
+        let hs_res = {triggered: false, payout: 0, grand: false, strength: null, upgrades: 0};
+        if (allow_hs) {
+            let coCount = 0;
+            const coinName = this.paytable.coin_name;
+            for (let r = 0; r < grid.length; r++)
+                for (let c = 0; c < grid[0].length; c++)
+                    if (grid[r][c] === coinName) coCount++;
+            if (coCount >= this.hs_trigger_count) hs_res = this.run_hs(grid);
+        }
 
         return {
             payout: total_spin_payout,
@@ -472,7 +486,7 @@ class Simulation {
         let current_balance = 0.0;
         
         let spin_idx = 0;
-        let chunkSize = 20000; 
+        let chunkSize = 100000;
         
         return new Promise((resolve) => {
             const doChunk = () => {
@@ -594,5 +608,98 @@ class Simulation {
             
             doChunk();
         });
+    }
+
+    // Synchronous version for Web Worker — no setTimeout yield needed off main thread.
+    runSimulationSync(numSpins, progressCallback, bonusBuyMode = false) {
+        let total_spent = 0.0, base_win_total = 0.0, bonus_win_total = 0.0, hs_win_total = 0.0;
+        let base_hits = 0, bonus_triggers = 0, hs_triggers = 0, grand_hits = 0;
+        let sum_win = 0.0, sum_win_sq = 0.0;
+        let strength_counts = {"Weak": 0, "Normal": 0, "Strong": 0, "Ultra": 0};
+        let total_upgrades = 0;
+        let buckets = {"0x": 0, "0-1x": 0, "1-5x": 0, "5-15x": 0, "15-50x": 0, "50x+": 0};
+        let sample_rate = Math.max(1, Math.floor(numSpins / 500));
+        let balance_history = [];
+        let current_balance = 0.0;
+        const PROGRESS_INTERVAL = 50000;
+
+        for (let spin_idx = 0; spin_idx < numSpins; spin_idx++) {
+            let spin_total_win = 0.0;
+
+            if (bonusBuyMode) {
+                total_spent += this.bet_amount * 100.0;
+                current_balance -= this.bet_amount * 100.0;
+                this.globalJackpotPool += (this.bet_amount * 100.0) * 0.005;
+                let mock_grid = [
+                    ["L1","L2","H1","H2","M1"],
+                    ["M2","W","L1","H1","H2"],
+                    ["L2","L1","W","M1","M2"]
+                ];
+                let hs_res = this.run_hs(mock_grid, true);
+                if (hs_res.triggered) {
+                    hs_triggers++; hs_win_total += hs_res.payout; spin_total_win += hs_res.payout;
+                    if (hs_res.grand) grand_hits++;
+                    if (hs_res.strength) strength_counts[hs_res.strength]++;
+                    total_upgrades += hs_res.upgrades;
+                }
+            } else {
+                total_spent += this.bet_amount;
+                current_balance -= this.bet_amount;
+                this.globalJackpotPool += this.bet_amount * 0.005;
+                let cascade_res = this.run_cascade_spin();
+                let base_spin_win = cascade_res.payout + cascade_res.scatter_payout;
+                if (base_spin_win > 0) { base_hits++; base_win_total += base_spin_win; spin_total_win += base_spin_win; }
+                if (cascade_res.scatters >= this.bonus_trigger_count) {
+                    bonus_triggers++;
+                    let b_payout = this.run_free_spins();
+                    bonus_win_total += b_payout; spin_total_win += b_payout;
+                }
+                if (cascade_res.hs_triggered) {
+                    hs_triggers++; hs_win_total += cascade_res.hs_payout; spin_total_win += cascade_res.hs_payout;
+                    if (cascade_res.hs_grand) grand_hits++;
+                    if (cascade_res.strength) strength_counts[cascade_res.strength]++;
+                    total_upgrades += cascade_res.upgrades;
+                }
+            }
+
+            sum_win += spin_total_win; sum_win_sq += spin_total_win * spin_total_win;
+            current_balance += spin_total_win;
+
+            let win_mult = spin_total_win / this.bet_amount;
+            if (win_mult === 0) buckets["0x"]++;
+            else if (win_mult <= 1.0) buckets["0-1x"]++;
+            else if (win_mult <= 5.0) buckets["1-5x"]++;
+            else if (win_mult <= 15.0) buckets["5-15x"]++;
+            else if (win_mult <= 50.0) buckets["15-50x"]++;
+            else buckets["50x+"]++;
+
+            if (spin_idx % sample_rate === 0) balance_history.push(current_balance);
+            if (progressCallback && spin_idx % PROGRESS_INTERVAL === 0) {
+                progressCallback((spin_idx / numSpins) * 100);
+            }
+        }
+
+        let total_win = base_win_total + bonus_win_total + hs_win_total;
+        let mean_win = sum_win / numSpins;
+        let variance = (sum_win_sq / numSpins) - (mean_win * mean_win);
+        for (let key in buckets) buckets[key] = (buckets[key] / numSpins) * 100;
+
+        return {
+            total_rtp:     total_win / total_spent,
+            base_rtp:      base_win_total / total_spent,
+            bonus_rtp:     bonus_win_total / total_spent,
+            hs_rtp:        hs_win_total / total_spent,
+            hit_rate:      base_hits / numSpins,
+            bonus_freq:    bonus_triggers > 0 ? numSpins / bonus_triggers : 0,
+            hs_freq:       hs_triggers > 0 ? numSpins / hs_triggers : 0,
+            grand_freq:    grand_hits > 0 ? numSpins / grand_hits : 0,
+            avg_jackpot:   grand_hits > 0 ? this.jackpotHitTotal / grand_hits : 0,
+            volatility:    Math.sqrt(Math.max(0, variance)),
+            num_spins:     numSpins,
+            buckets,
+            balance_history,
+            strength_counts,
+            avg_upgrades:  hs_triggers > 0 ? total_upgrades / hs_triggers : 0
+        };
     }
 }

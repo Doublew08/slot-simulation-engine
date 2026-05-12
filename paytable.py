@@ -27,13 +27,19 @@ class Paytable:
         self.coin_name: Optional[str] = next(
             (s.name for s in symbols if s.is_coin), None
         )
+        # Flat (name, count) → payout dict built once at init.
+        # Replaces nested _symbols[name].payouts[count] chain on every eval call.
+        self._payout_lookup: Dict[tuple, float] = {
+            (s.name, count): val
+            for s in symbols
+            for count, val in s.payouts.items()
+        }
 
     def get(self, name: str) -> Optional[Symbol]:
         return self._symbols.get(name)
 
     def payout(self, name: str, count: int) -> float:
-        sym = self._symbols.get(name)
-        return sym.payouts.get(count, 0.0) if sym else 0.0
+        return self._payout_lookup.get((name, count), 0.0)
 
     def is_wild(self, name: str) -> bool:
         sym = self._symbols.get(name)

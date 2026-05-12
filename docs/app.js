@@ -173,10 +173,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvBtn = document.getElementById('exportCsvBtn');
     const exportJsonBtn = document.getElementById('exportJsonBtn');
 
+    // Run simulation — uses Web Worker when available (non-blocking, faster)
+    // Falls back to main-thread chunked Promise if Workers are unsupported.
+    function runSimulation(numSpins, coinProb, weights, bonusBuyMode, onProgress) {
+        if (typeof Worker !== 'undefined') {
+            return new Promise((resolve, reject) => {
+                const worker = new Worker('simulation.worker.js');
+                worker.onmessage = (e) => {
+                    if (e.data.type === 'progress') {
+                        onProgress(e.data.value);
+                    } else if (e.data.type === 'done') {
+                        worker.terminate();
+                        resolve(e.data.result);
+                    }
+                };
+                worker.onerror = (err) => { worker.terminate(); reject(err); };
+                worker.postMessage({ type: 'run', payload: { numSpins, coinProb, weights, bonusBuyMode } });
+            });
+        }
+        // Fallback: run on main thread
+        const fallbackSim = new Simulation();
+        fallbackSim.setupGame(weights, coinProb);
+        return fallbackSim.runSimulation(numSpins, onProgress, bonusBuyMode);
+    }
+
     runBtn.addEventListener('click', async () => {
         const numSpins = parseInt(document.getElementById('numSpins').value) || 1000000;
         const coinProb = parseFloat(document.getElementById('coinProb').value) || 0.05;
         const bonusBuyMode = document.getElementById('bonusBuyMode').checked;
+        const weights = getCustomWeights();
 
         runBtn.disabled = true;
         btnText.style.display = 'none';
@@ -187,14 +212,15 @@ document.addEventListener('DOMContentLoaded', () => {
         exportCsvBtn.style.display = 'none';
         exportJsonBtn.style.display = 'none';
 
+        // Keep currentSim on main thread for visual spin / documentation
         currentSim = new Simulation();
-        currentSim.setupGame(getCustomWeights(), coinProb);
-        updateDocumentation(); // sync documentation
+        currentSim.setupGame(weights, coinProb);
+        updateDocumentation();
 
-        lastResults = await currentSim.runSimulation(numSpins, (percent) => {
+        lastResults = await runSimulation(numSpins, coinProb, weights, bonusBuyMode, (percent) => {
             progressBar.style.width = `${percent}%`;
             progressText.innerText = `${percent.toFixed(1)}%`;
-        }, bonusBuyMode);
+        });
 
         runBtn.disabled = false;
         btnText.style.display = 'block';
