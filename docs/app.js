@@ -6,7 +6,9 @@ let currentSim = null;
 let lastResults = null; 
 let autoSpinInterval = null;
 let usePythonBackend = false;
-const PYTHON_API = 'http://localhost:8000';
+const PYTHON_API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000'
+    : 'https://slot-simulation-engine.onrender.com';
 
 // --- AUDIO ENGINE ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
