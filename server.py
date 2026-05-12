@@ -9,6 +9,7 @@ Opens http://localhost:8000 automatically.
 API docs at http://localhost:8000/api/docs
 """
 import asyncio
+import hashlib
 import json
 import os
 import sys
@@ -30,6 +31,12 @@ from main import build_game
 
 
 app = FastAPI(title="Slot Simulation API", docs_url="/api/docs")
+
+_result_cache: dict = {}
+
+def _cache_key(req) -> str:
+    raw = f"{req.num_spins}:{req.seed}:{req.wild_weight}"
+    return hashlib.md5(raw.encode()).hexdigest()
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,6 +72,10 @@ def health():
 
 @app.post("/api/simulate")
 async def simulate(req: SimulateRequest):
+    key = _cache_key(req)
+    if key in _result_cache:
+        return _result_cache[key]
+
     loop = asyncio.get_event_loop()
     future: asyncio.Future = loop.create_future()
 
@@ -95,6 +106,7 @@ async def simulate(req: SimulateRequest):
                 "hs_freq":         metrics["Hold and Spin Frequency (1 in X)"],
                 "grand_freq":      metrics["Grand Jackpot Frequency (1 in X)"],
                 "volatility":      metrics["Volatility"],
+                "rtp_ci_95":       metrics.get("RTP CI 95%", 0.0),
                 "avg_win":         metrics["Avg Win Per Spin"],
                 "avg_bonus_win":   metrics["Avg Bonus Win"],
                 "avg_hs_win":      metrics["Avg Hold and Spin Win"],
@@ -105,6 +117,7 @@ async def simulate(req: SimulateRequest):
                 "avg_jackpot":     None,
                 "backend":         "python",
             }
+            _result_cache[key] = result
             loop.call_soon_threadsafe(future.set_result, result)
 
         except Exception as exc:

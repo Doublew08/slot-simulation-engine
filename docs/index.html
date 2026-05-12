@@ -106,6 +106,9 @@
                     <button id="exportJsonBtn" class="btn-secondary mt-1" style="display: none;">
                         ⚙️ EXPORT JSON PAR SHEET
                     </button>
+                    <button id="shareUrlBtn" class="btn-secondary mt-1" style="display: none;">
+                        🔗 SHARE CONFIG URL
+                    </button>
                 </section>
 
                 <!-- Results Panel -->
@@ -116,6 +119,7 @@
                         <div class="metric-card">
                             <h3>Total RTP</h3>
                             <p class="metric-value highlight" id="mTotalRtp">--%</p>
+                            <small id="mRtpCi" style="color:#64748b;font-size:0.75rem;display:block;margin-top:0.25rem"></small>
                         </div>
                         <div class="metric-card">
                             <h3>Volatility Index</h3>
@@ -169,6 +173,15 @@
                     </div>
                 </section>
             </div>
+
+            <!-- Simulation History -->
+            <section class="glass-panel" id="historySection" style="display:none; margin-top: 1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                    <h2 style="margin:0;">Simulation History</h2>
+                    <button id="clearHistoryBtn" class="btn-secondary" style="padding:0.4rem 0.8rem; font-size:0.85rem;">Clear</button>
+                </div>
+                <div id="historyList"></div>
+            </section>
         </div>
 
         <!-- Reel Editor Tab -->
