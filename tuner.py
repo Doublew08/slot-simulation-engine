@@ -8,18 +8,25 @@ Usage:
 """
 import io
 import math
+import os
 import sys
 import contextlib
 
 from main import build_game
 
+# Use all available cores for each RM evaluation — parallelises the simulation
+# within each step. RM steps are sequential (each needs previous result), but
+# the Monte Carlo inside each step is embarrassingly parallel.
+_WORKERS = max(1, os.cpu_count() or 1)
+
 
 def evaluate_rtp(wild_weight: float, num_spins: int = 500_000) -> float:
-    """Run a silent simulation and return Total RTP (random seed for unbiased RM estimates)."""
+    """Run a silent parallel simulation and return Total RTP."""
     runner = build_game(wild_weight)
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
-        metrics = runner.run(num_spins=num_spins, output_csv=None, seed=None)
+        metrics = runner.run(num_spins=num_spins, output_csv=None,
+                             seed=None, workers=_WORKERS)
     return metrics["Total RTP"]
 
 
@@ -35,7 +42,7 @@ def main():
     SPINS    = 500_000
 
     print(f"Target RTP: {target_rtp:.4%}")
-    print(f"Robbins-Monro ({MAX_ITER} iterations × {SPINS:,} spins, Polyak-Ruppert averaging)")
+    print(f"Robbins-Monro ({MAX_ITER} iterations × {SPINS:,} spins × {_WORKERS} workers, Polyak-Ruppert averaging)")
 
     x          = 4.0   # sensible starting wild_weight
     x_history  = []
