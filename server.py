@@ -115,12 +115,20 @@ def simulate(req: SimulateRequest):
 
     def stream():
         while True:
-            msg = q.get()
+            try:
+                msg = q.get(timeout=15)
+            except queue.Empty:
+                yield ": keep-alive\n\n"  # prevent proxy timeout
+                continue
             yield _sse(msg)
             if msg["type"] in ("done", "error"):
                 break
 
-    return StreamingResponse(stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 @app.post("/api/tune")
@@ -168,12 +176,20 @@ def tune(req: TuneRequest):
 
     def stream():
         while True:
-            msg = q.get()
+            try:
+                msg = q.get(timeout=15)
+            except queue.Empty:
+                yield ": keep-alive\n\n"
+                continue
             yield _sse(msg)
             if msg["type"] in ("done", "error"):
                 break
 
-    return StreamingResponse(stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 # Static frontend — mount last so API routes take priority
