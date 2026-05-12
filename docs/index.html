@@ -231,33 +231,58 @@
             <section class="glass-panel">
                 <h2 class="text-center">System Documentation</h2>
                 <p class="text-center" style="color: var(--text-secondary);">How the Slot Engine Works</p>
-                
+
                 <div class="metric-card p-4" style="margin-top: 2rem; margin-bottom: 2rem;">
                     <h3 style="color: var(--primary-color); margin-bottom: 1rem;">What is this?</h3>
                     <p style="margin-bottom: 1rem; line-height: 1.6;">
-                        This is a <strong>Monte Carlo Simulation Engine</strong> designed to test and balance slot machine mathematics. 
-                        In the casino gaming industry, math models must be rigorously tested to ensure they hit target payouts and remain profitable for the house while being engaging for the player. 
-                        This engine rapidly simulates millions of mathematical permutations to converge on theoretical probabilities.
+                        A <strong>Monte Carlo Simulation Engine</strong> for slot game math design. It models a full 3×5 reel game with 20-payline win evaluation, cascade tumble mechanic, scatter-triggered free spins, and Dragon Link–style Hold &amp; Spin with a four-tier jackpot system. Run millions of simulated spins in seconds to compute theoretical RTP, volatility, hit rates, and win distributions — the same analysis used by commercial casino math teams.
+                    </p>
+                    <p style="line-height: 1.6; color: var(--text-secondary);">
+                        The simulation runs in a <strong>Web Worker</strong> so your browser stays responsive during long runs. A Python engine (see GitHub) handles deeper analysis: multiprocessing across CPU cores, Welford online variance, and a binary-search RTP tuner.
                     </p>
                 </div>
 
                 <div class="dashboard" style="grid-template-columns: 1fr 1fr;">
                     <div class="metric-card p-4">
-                        <h3 style="color: var(--secondary-color); margin-bottom: 1rem;">Key Metrics</h3>
-                        <ul style="list-style: none; line-height: 1.8;">
-                            <li><strong style="color: var(--primary-color);">RTP (Return to Player):</strong> The theoretical percentage of wagered money paid back over millions of spins. Example: 95% RTP means the house keeps 5%.</li>
-                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Volatility Index:</strong> A measure of the game's variance. High Volatility = infrequent but massive wins. Low Volatility = frequent but small wins.</li>
-                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Hit Rate:</strong> The percentage of spins that result in any payout greater than zero.</li>
+                        <h3 style="color: var(--primary-color); margin-bottom: 1rem;">📊 Key Metrics</h3>
+                        <ul style="list-style: none; line-height: 1.9;">
+                            <li><strong style="color: white;">RTP (Return to Player)</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Percentage of wagered money returned over millions of spins. 95% RTP = house keeps 5%. Decomposed into Base / Bonus / Hold &amp; Spin contributions.</span></li>
+                            <li style="margin-top: 1rem;"><strong style="color: white;">Volatility Index</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Standard deviation of win-per-spin ÷ bet. High volatility = rare but massive wins. Low = frequent small wins.</span></li>
+                            <li style="margin-top: 1rem;"><strong style="color: white;">Hit Rate</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Fraction of spins returning any payout &gt; 0.</span></li>
+                            <li style="margin-top: 1rem;"><strong style="color: white;">Win Distribution</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Buckets on log scale: 0×, 0–1×, 1–5×, 5–15×, 15–50×, 50×+. Shows the shape of the payout curve.</span></li>
                         </ul>
                     </div>
-                    
+
                     <div class="metric-card p-4">
-                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">Game Mechanics</h3>
-                        <ul style="list-style: none; line-height: 1.8;">
-                            <li><strong style="color: var(--primary-color);">The Grid:</strong> A standard 3x5 layout evaluated across 20 distinct paylines from left to right.</li>
-                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Free Spins:</strong> Triggered by landing 3 or more Scatter (SC) symbols. Multipliers are applied during these spins.</li>
-                            <li style="margin-top: 1rem;"><strong style="color: var(--primary-color);">Hold & Spin:</strong> Triggered by landing 6 or more Coin (CO) symbols. The coins lock in place, granting 3 respins to collect more. Filling all 15 positions awards the <strong>Grand Jackpot</strong>!</li>
+                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">🎰 Game Mechanics</h3>
+                        <ul style="list-style: none; line-height: 1.9;">
+                            <li><strong style="color: white;">Base Game + Cascades</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">3×5 grid evaluated across 20 paylines left-to-right with wild substitution. Winning symbols are removed and new ones drop in (tumble/cascade), chaining wins from a single bet.</span></li>
+                            <li style="margin-top: 1rem;"><strong style="color: white;">Free Spins</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Triggered by 3+ Scatter (SC) symbols anywhere. Awards 10 free spins at 2× multiplier with retrigger cap (100 max). H&amp;S does not fire inside free spins.</span></li>
+                            <li style="margin-top: 1rem;"><strong style="color: white;">Hold &amp; Spin</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Triggered by 6+ Coin (CO) symbols. Coins lock; 3 lives reset on each new coin. Full screen = Grand Jackpot added to coin total. Mini / Minor / Major jackpots from weighted pool.</span></li>
+                            <li style="margin-top: 1rem;"><strong style="color: white;">Feature Buy (100× Bet)</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Directly purchases a guaranteed Hold &amp; Spin session with 6 coins pre-locked. Calibrated to ~95% RTP on the buy cost.</span></li>
                         </ul>
+                    </div>
+                </div>
+
+                <div class="metric-card p-4" style="margin-top: 1.5rem;">
+                    <h3 style="color: var(--wild-color); margin-bottom: 1rem;">⚡ Performance</h3>
+                    <div class="dashboard" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0;">
+                        <div style="text-align:center;">
+                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">Web Worker</div>
+                            <div style="color:var(--text-secondary);font-size:0.85rem;">Simulation off main thread — UI never freezes</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">Uint8Array</div>
+                            <div style="color:var(--text-secondary);font-size:0.85rem;">Reel pools in typed arrays — L1-cache friendly</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">H&amp;S Filter</div>
+                            <div style="color:var(--text-secondary);font-size:0.85rem;">Coin pre-count skips full H&amp;S on 99.98% of spins</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">Python: ~5×</div>
+                            <div style="color:var(--text-secondary);font-size:0.85rem;">Batch RNG + local caching in Python engine</div>
+                        </div>
                     </div>
                 </div>
             </section>
