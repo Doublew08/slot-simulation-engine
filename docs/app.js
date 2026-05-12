@@ -232,42 +232,36 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvBtn = document.getElementById('exportCsvBtn');
     const exportJsonBtn = document.getElementById('exportJsonBtn');
 
-    // Fetch simulation from Python backend via SSE stream.
+    // Fetch simulation from Python backend — plain JSON response (no SSE, proxy-safe).
     async function runSimulationPython(numSpins, onProgress) {
         const body = {
             num_spins:   numSpins,
-            workers:     parseInt(document.getElementById('pyWorkers')?.value)  || 1,
             wild_weight: parseFloat(document.getElementById('pyWildWeight')?.value) || 4.238,
         };
         const seedVal = document.getElementById('pySeed')?.value;
         if (seedVal && seedVal.trim() !== '') body.seed = parseInt(seedVal);
 
-        const response = await fetch(`${PYTHON_API}/api/simulate`, {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(body),
-        });
-        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        // Animate progress bar while waiting (server gives no streaming progress)
+        let fakePct = 2;
+        onProgress(fakePct);
+        const ticker = setInterval(() => {
+            fakePct = Math.min(fakePct + (90 - fakePct) * 0.04, 90);
+            onProgress(fakePct);
+        }, 1000);
 
-        const reader  = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop();
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const msg = JSON.parse(line.slice(6));
-                if (msg.type === 'progress')  onProgress(msg.value * 100);
-                else if (msg.type === 'done') return msg.result;
-                else if (msg.type === 'error') throw new Error(msg.message);
-            }
+        try {
+            const response = await fetch(`${PYTHON_API}/api/simulate`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(body),
+            });
+            if (!response.ok) throw new Error(`Server error: ${response.status}`);
+            const result = await response.json();
+            onProgress(100);
+            return result;
+        } finally {
+            clearInterval(ticker);
         }
-        throw new Error('Stream ended without result');
     }
 
     // Run simulation — dispatches to Python API or JS engine based on toggle.
