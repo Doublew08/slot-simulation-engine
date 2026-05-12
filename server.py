@@ -99,7 +99,7 @@ async def simulate(req: SimulateRequest):
                 "avg_bonus_win":   metrics["Avg Bonus Win"],
                 "avg_hs_win":      metrics["Avg Hold and Spin Win"],
                 "buckets":         buckets,
-                "balance_history": [],
+                "balance_history": metrics.get("balance_history", []),
                 "strength_counts": None,
                 "avg_upgrades":    None,
                 "avg_jackpot":     None,
