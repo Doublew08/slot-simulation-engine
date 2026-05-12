@@ -1,16 +1,9 @@
-const PYTHON_API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8000'
-    : 'https://slot-simulation-engine.onrender.com';
-
-const IS_LOCAL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
 let fitnessChartInstance = null;
-let currentMode  = 'js';
 let activeWorker = null;
 
 const SYMBOLS = ["W", "H1", "H2", "M1", "M2", "L1", "L2", "SC", "CO"];
 
-// ── Chart — incremental updates, no destroy/recreate ──────────────────────
+// ── Chart — incremental updates ────────────────────────────────────────────
 
 function initChart(targetRtp) {
     Chart.defaults.color       = '#94a3b8';
@@ -43,7 +36,7 @@ function initChart(targetRtp) {
                     tension: 0.1,
                 },
                 {
-                    label: `Target ${(targetRtp).toFixed(2)}%`,
+                    label: `Target ${targetRtp.toFixed(2)}%`,
                     data: [],
                     borderColor: '#10b981',
                     borderWidth: 2,
@@ -75,10 +68,10 @@ function pushChartPoint(evalNum, bestRtp, currentRtp, targetRtp) {
     c.data.datasets[0].data.push(bestRtp);
     c.data.datasets[1].data.push(currentRtp);
     c.data.datasets[2].data.push(targetRtp);
-    c.update('none'); // no animation — instant
+    c.update('none');
 }
 
-// ── Shared UI helpers ──────────────────────────────────────────────────────
+// ── UI helpers ─────────────────────────────────────────────────────────────
 
 function setRunning(yes) {
     const btn    = document.getElementById('runEvolveBtn');
@@ -114,47 +107,9 @@ function wireSendToMain(weights) {
     btn.style.display = 'block';
 }
 
-// ── Server connection check ────────────────────────────────────────────────
+// ── CMA-ES via Web Worker ──────────────────────────────────────────────────
 
-function setConnStatus(state) {
-    const el = document.getElementById('connStatus');
-    if (!el) return;
-    const map = {
-        checking:   { text: 'Checking…',       color: '#94a3b8' },
-        warming:    { text: 'Warming up…',      color: '#f59e0b' },
-        connected:  { text: 'Connected',        color: '#10b981' },
-        offline:    { text: 'Server offline',   color: '#ef4444' },
-    };
-    const s = map[state] || map.checking;
-    el.textContent = s.text;
-    el.style.color = s.color;
-}
-
-async function pingServer() {
-    setConnStatus('checking');
-    // First fast check (5s) — already warm?
-    try {
-        const res = await fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(5000) });
-        if (res.ok) { setConnStatus('connected'); return; }
-    } catch {}
-    // Cold start — Render can take up to 60s to wake
-    setConnStatus('warming');
-    try {
-        const res = await fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(65000) });
-        setConnStatus(res.ok ? 'connected' : 'offline');
-    } catch {
-        setConnStatus('offline');
-    }
-}
-
-// Warmup ping on page load (non-localhost) so server is ready before user clicks
-if (!IS_LOCAL) {
-    fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(65000) }).catch(() => {});
-}
-
-// ── JS CMA-ES via Worker ───────────────────────────────────────────────────
-
-function runJsCmaEs(targetRtp, maxEvals, spinsPerEval) {
+function runCmaEs(targetRtp, maxEvals, spinsPerEval) {
     return new Promise((resolve, reject) => {
         if (activeWorker) { activeWorker.terminate(); activeWorker = null; }
 
@@ -165,21 +120,18 @@ function runJsCmaEs(targetRtp, maxEvals, spinsPerEval) {
 
         worker.onmessage = (e) => {
             const msg = e.data;
-
             if (msg.type === 'progress') {
                 pushChartPoint(msg.eval, msg.best_rtp * 100, msg.rtp * 100, targetRtp * 100);
                 setProgress((msg.eval / msg.total) * 100, `Evaluation ${msg.eval} / ${msg.total}`);
                 updateMetrics(msg.best_rtp, msg.fitness, msg.eval);
                 renderOptimizedWeights(msg.weights);
-
             } else if (msg.type === 'done') {
                 activeWorker = null;
                 worker.terminate();
                 updateMetrics(msg.rtp, msg.delta, msg.evals);
                 renderOptimizedWeights(msg.weights);
-                setProgress(100, 'JS CMA-ES Complete!');
+                setProgress(100, 'CMA-ES Complete!');
                 resolve(msg.weights);
-
             } else if (msg.type === 'error') {
                 activeWorker = null;
                 worker.terminate();
@@ -197,101 +149,17 @@ function runJsCmaEs(targetRtp, maxEvals, spinsPerEval) {
     });
 }
 
-// ── Python CMA-ES via SSE ──────────────────────────────────────────────────
-
-async function runCmaEsPython(targetRtp, maxEvals, spinsPerEval) {
-    const resp = await fetch(`${PYTHON_API}/api/balance`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ target_rtp: targetRtp, max_evals: maxEvals, spins_per_eval: spinsPerEval }),
-    });
-
-    if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-        throw new Error(err.detail || resp.statusText);
-    }
-
-    initChart(targetRtp * 100);
-
-    const reader  = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let   buf     = '';
-    let   bestWeights = null;
-
-    while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-
-        const lines = buf.split('\n');
-        buf = lines.pop();
-
-        for (let line of lines) {
-            if (!line.startsWith('data: ')) continue;
-            let msg;
-            try { msg = JSON.parse(line.slice(6)); } catch { continue; }
-
-            if (msg.type === 'progress') {
-                pushChartPoint(msg.eval, (msg.best_rtp ?? msg.rtp) * 100, msg.rtp * 100, targetRtp * 100);
-                setProgress((msg.eval / msg.total) * 100, `Evaluation ${msg.eval} / ${msg.total}`);
-                updateMetrics(msg.best_rtp ?? msg.rtp, msg.fitness, msg.eval);
-                renderOptimizedWeights(msg.weights);
-
-            } else if (msg.type === 'done') {
-                bestWeights = msg.weights;
-                updateMetrics(msg.rtp, msg.delta, msg.evals);
-                renderOptimizedWeights(msg.weights);
-                setProgress(100, 'Python CMA-ES Complete!');
-
-            } else if (msg.type === 'error') {
-                throw new Error(msg.message);
-            }
-        }
-    }
-
-    return bestWeights;
-}
-
-// ── Main click handler ─────────────────────────────────────────────────────
+// ── Run handler ────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
-    const modeJsBtn  = document.getElementById('modeJsBtn');
-    const modePyBtn  = document.getElementById('modePyBtn');
-    const modeStatus = document.getElementById('modeStatus');
-    const pyNotice   = document.getElementById('pyNotice');
-
-    function setMode(mode) {
-        currentMode = mode;
-        if (mode === 'js') {
-            modeJsBtn.classList.add('active');
-            modePyBtn.classList.remove('active');
-            pyNotice.style.display = 'none';
-            modeStatus.textContent = 'Browser CMA-ES — no server required, runs in Web Worker';
-        } else {
-            modePyBtn.classList.add('active');
-            modeJsBtn.classList.remove('active');
-            pyNotice.style.display = '';
-            modeStatus.textContent = 'Python CMA-ES — runs on Render, no setup needed';
-            pingServer(); // check connection when user switches to Python mode
-        }
-    }
-
-    modeJsBtn.addEventListener('click', () => setMode('js'));
-    modePyBtn.addEventListener('click', () => setMode('py'));
-
     document.getElementById('runEvolveBtn').addEventListener('click', async () => {
         const targetRtp    = parseFloat(document.getElementById('targetRtp').value) / 100 || 0.96;
-        const maxEvals     = parseInt(document.getElementById('maxEvals').value)     || 80;
-        const spinsPerEval = parseInt(document.getElementById('spinsPerEval').value) || 50_000;
+        const maxEvals     = parseInt(document.getElementById('maxEvals').value)     || 150;
+        const spinsPerEval = parseInt(document.getElementById('spinsPerEval').value) || 200_000;
         setRunning(true);
 
         try {
-            let bestWeights;
-            if (currentMode === 'js') {
-                bestWeights = await runJsCmaEs(targetRtp, maxEvals, spinsPerEval);
-            } else {
-                bestWeights = await runCmaEsPython(targetRtp, maxEvals, spinsPerEval);
-            }
+            const bestWeights = await runCmaEs(targetRtp, maxEvals, spinsPerEval);
             wireSendToMain(bestWeights);
         } catch (err) {
             document.getElementById('evolveProgressText').innerText = `Error: ${err.message}`;
