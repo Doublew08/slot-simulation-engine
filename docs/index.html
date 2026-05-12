@@ -228,64 +228,202 @@
 
         <!-- About Tab -->
         <div id="about" class="tab-content">
-            <section class="glass-panel">
-                <h2 class="text-center">System Documentation</h2>
-                <p class="text-center" style="color: var(--text-secondary);">How the Slot Engine Works</p>
 
-                <div class="metric-card p-4" style="margin-top: 2rem; margin-bottom: 2rem;">
-                    <h3 style="color: var(--primary-color); margin-bottom: 1rem;">What is this?</h3>
-                    <p style="margin-bottom: 1rem; line-height: 1.6;">
-                        A <strong>Monte Carlo Simulation Engine</strong> for slot game math design. It models a full 3×5 reel game with 20-payline win evaluation, cascade tumble mechanic, scatter-triggered free spins, and Dragon Link–style Hold &amp; Spin with a four-tier jackpot system. Run millions of simulated spins in seconds to compute theoretical RTP, volatility, hit rates, and win distributions — the same analysis used by commercial casino math teams.
-                    </p>
-                    <p style="line-height: 1.6; color: var(--text-secondary);">
-                        The simulation runs in a <strong>Web Worker</strong> so your browser stays responsive during long runs. A Python engine (see GitHub) handles deeper analysis: multiprocessing across CPU cores, Welford online variance, and a binary-search RTP tuner.
-                    </p>
+            <!-- Hero -->
+            <section class="glass-panel text-center" style="padding: 3rem 2rem;">
+                <div style="font-size:3rem;margin-bottom:0.75rem;">🎰</div>
+                <h2 style="font-size:2rem;margin-bottom:0.75rem;background:linear-gradient(135deg,#fff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Slot Game Simulation Engine</h2>
+                <p style="color:var(--text-secondary);max-width:620px;margin:0 auto 1.5rem;line-height:1.7;font-size:1.05rem;">
+                    Production-grade Monte Carlo slot math toolkit. Model full 3×5 reel games with cascades, free spins, and Hold &amp; Spin jackpots. Compute RTP, volatility, and win distributions across millions of spins — the same analysis used by commercial casino studios.
+                </p>
+                <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+                    <a href="https://github.com/Doublew08/slot-simulation-engine" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.65rem 1.4rem;background:var(--primary-color);color:white;border-radius:10px;text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:0.95rem;">
+                        ★ View on GitHub
+                    </a>
+                    <a href="balancer.html" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.65rem 1.4rem;background:rgba(255,255,255,0.07);color:white;border:1px solid rgba(255,255,255,0.15);border-radius:10px;text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:0.95rem;">
+                        ⚙️ Auto-Balancer Studio
+                    </a>
+                </div>
+            </section>
+
+            <!-- Feature grid -->
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.25rem;margin-bottom:1.5rem;">
+
+                <div class="metric-card p-4">
+                    <div style="font-size:1.75rem;margin-bottom:0.6rem;">🎲</div>
+                    <h3 style="color:white;margin-bottom:0.5rem;font-size:1.05rem;">Monte Carlo Runner</h3>
+                    <p style="color:var(--text-secondary);font-size:0.88rem;line-height:1.6;">Simulate up to 50 million spins directly in the browser. Progress updates live; results export to CSV or JSON PAR sheet.</p>
                 </div>
 
-                <div class="dashboard" style="grid-template-columns: 1fr 1fr;">
-                    <div class="metric-card p-4">
-                        <h3 style="color: var(--primary-color); margin-bottom: 1rem;">📊 Key Metrics</h3>
-                        <ul style="list-style: none; line-height: 1.9;">
-                            <li><strong style="color: white;">RTP (Return to Player)</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Percentage of wagered money returned over millions of spins. 95% RTP = house keeps 5%. Decomposed into Base / Bonus / Hold &amp; Spin contributions.</span></li>
-                            <li style="margin-top: 1rem;"><strong style="color: white;">Volatility Index</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Standard deviation of win-per-spin ÷ bet. High volatility = rare but massive wins. Low = frequent small wins.</span></li>
-                            <li style="margin-top: 1rem;"><strong style="color: white;">Hit Rate</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Fraction of spins returning any payout &gt; 0.</span></li>
-                            <li style="margin-top: 1rem;"><strong style="color: white;">Win Distribution</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Buckets on log scale: 0×, 0–1×, 1–5×, 5–15×, 15–50×, 50×+. Shows the shape of the payout curve.</span></li>
-                        </ul>
-                    </div>
-
-                    <div class="metric-card p-4">
-                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">🎰 Game Mechanics</h3>
-                        <ul style="list-style: none; line-height: 1.9;">
-                            <li><strong style="color: white;">Base Game + Cascades</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">3×5 grid evaluated across 20 paylines left-to-right with wild substitution. Winning symbols are removed and new ones drop in (tumble/cascade), chaining wins from a single bet.</span></li>
-                            <li style="margin-top: 1rem;"><strong style="color: white;">Free Spins</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Triggered by 3+ Scatter (SC) symbols anywhere. Awards 10 free spins at 2× multiplier with retrigger cap (100 max). H&amp;S does not fire inside free spins.</span></li>
-                            <li style="margin-top: 1rem;"><strong style="color: white;">Hold &amp; Spin</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Triggered by 6+ Coin (CO) symbols. Coins lock; 3 lives reset on each new coin. Full screen = Grand Jackpot added to coin total. Mini / Minor / Major jackpots from weighted pool.</span></li>
-                            <li style="margin-top: 1rem;"><strong style="color: white;">Feature Buy (100× Bet)</strong><br><span style="color:var(--text-secondary);font-size:0.9rem;">Directly purchases a guaranteed Hold &amp; Spin session with 6 coins pre-locked. Calibrated to ~95% RTP on the buy cost.</span></li>
-                        </ul>
-                    </div>
+                <div class="metric-card p-4">
+                    <div style="font-size:1.75rem;margin-bottom:0.6rem;">📊</div>
+                    <h3 style="color:white;margin-bottom:0.5rem;font-size:1.05rem;">RTP Decomposition</h3>
+                    <p style="color:var(--text-secondary);font-size:0.88rem;line-height:1.6;">Total RTP split into Base Game, Free Spins, and Hold &amp; Spin contributions so each mechanic can be tuned independently.</p>
                 </div>
 
-                <div class="metric-card p-4" style="margin-top: 1.5rem;">
-                    <h3 style="color: var(--wild-color); margin-bottom: 1rem;">⚡ Performance</h3>
-                    <div class="dashboard" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 0;">
-                        <div style="text-align:center;">
-                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">Web Worker</div>
-                            <div style="color:var(--text-secondary);font-size:0.85rem;">Simulation off main thread — UI never freezes</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">Uint8Array</div>
-                            <div style="color:var(--text-secondary);font-size:0.85rem;">Reel pools in typed arrays — L1-cache friendly</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">H&amp;S Filter</div>
-                            <div style="color:var(--text-secondary);font-size:0.85rem;">Coin pre-count skips full H&amp;S on 99.98% of spins</div>
-                        </div>
-                        <div style="text-align:center;">
-                            <div style="font-size:1.8rem;font-weight:700;color:white;font-family:'Space Grotesk',sans-serif;">Python: ~5×</div>
-                            <div style="color:var(--text-secondary);font-size:0.85rem;">Batch RNG + local caching in Python engine</div>
-                        </div>
+                <div class="metric-card p-4">
+                    <div style="font-size:1.75rem;margin-bottom:0.6rem;">🔒</div>
+                    <h3 style="color:white;margin-bottom:0.5rem;font-size:1.05rem;">Hold &amp; Spin Jackpots</h3>
+                    <p style="color:var(--text-secondary);font-size:0.88rem;line-height:1.6;">Dragon Link–style four-tier jackpot system (Mini / Minor / Major / Grand). 3 lives, coin upgrades, full-screen Grand bonus.</p>
+                </div>
+
+                <div class="metric-card p-4">
+                    <div style="font-size:1.75rem;margin-bottom:0.6rem;">🌊</div>
+                    <h3 style="color:white;margin-bottom:0.5rem;font-size:1.05rem;">Cascade Tumble</h3>
+                    <p style="color:var(--text-secondary);font-size:0.88rem;line-height:1.6;">Winning symbols removed and replaced by new drops, chaining consecutive wins from a single bet. Up to 15 cascade levels per spin.</p>
+                </div>
+
+                <div class="metric-card p-4">
+                    <div style="font-size:1.75rem;margin-bottom:0.6rem;">🎯</div>
+                    <h3 style="color:white;margin-bottom:0.5rem;font-size:1.05rem;">Reel Editor &amp; Presets</h3>
+                    <p style="color:var(--text-secondary);font-size:0.88rem;line-height:1.6;">Live-edit symbol weights per reel. Low / Medium / High volatility presets. Changes reflect instantly in the paytable and reel-strip tables.</p>
+                </div>
+
+                <div class="metric-card p-4">
+                    <div style="font-size:1.75rem;margin-bottom:0.6rem;">👤</div>
+                    <h3 style="color:white;margin-bottom:0.5rem;font-size:1.05rem;">Session Risk Simulator</h3>
+                    <p style="color:var(--text-secondary);font-size:0.88rem;line-height:1.6;">Simulate thousands of player sessions to compute risk of ruin, average end balance, and profit probability from a starting bankroll.</p>
+                </div>
+
+            </div>
+
+            <!-- How it works -->
+            <section class="glass-panel" style="margin-bottom:1.5rem;">
+                <h2 style="text-align:center;margin-bottom:2rem;">How It Works</h2>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;text-align:center;">
+                    <div>
+                        <div style="width:52px;height:52px;border-radius:50%;background:var(--primary-color);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:700;margin:0 auto 1rem;">1</div>
+                        <h3 style="color:white;margin-bottom:0.5rem;font-size:1rem;">Configure</h3>
+                        <p style="color:var(--text-secondary);font-size:0.87rem;line-height:1.6;">Set spin count, coin probability, and symbol weights in the Reel Editor. Choose a volatility preset or dial in custom values.</p>
+                    </div>
+                    <div>
+                        <div style="width:52px;height:52px;border-radius:50%;background:var(--primary-color);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:700;margin:0 auto 1rem;">2</div>
+                        <h3 style="color:white;margin-bottom:0.5rem;font-size:1rem;">Simulate</h3>
+                        <p style="color:var(--text-secondary);font-size:0.87rem;line-height:1.6;">Hit Run. A Web Worker executes the full Monte Carlo loop off the main thread. Progress bar tracks completion in real time.</p>
+                    </div>
+                    <div>
+                        <div style="width:52px;height:52px;border-radius:50%;background:var(--primary-color);display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:700;margin:0 auto 1rem;">3</div>
+                        <h3 style="color:white;margin-bottom:0.5rem;font-size:1rem;">Analyze</h3>
+                        <p style="color:var(--text-secondary);font-size:0.87rem;line-height:1.6;">Read RTP, volatility, hit rate, and trigger frequencies. Export a CSV report or full JSON PAR sheet for documentation.</p>
                     </div>
                 </div>
             </section>
+
+            <!-- Mechanics + Math in two columns -->
+            <div class="dashboard" style="grid-template-columns:1fr 1fr;margin-bottom:1.5rem;">
+
+                <div class="glass-panel" style="margin-bottom:0;">
+                    <h2 style="margin-bottom:1.25rem;">🎮 Game Mechanics</h2>
+
+                    <div style="display:flex;flex-direction:column;gap:1rem;">
+                        <div class="metric-card" style="padding:1rem;">
+                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+                                <span style="background:var(--primary-color);padding:0.2rem 0.55rem;border-radius:6px;font-size:0.75rem;font-family:'Space Grotesk',sans-serif;font-weight:700;">BASE</span>
+                                <strong style="color:white;">Base Game + Cascade</strong>
+                            </div>
+                            <p style="color:var(--text-secondary);font-size:0.85rem;line-height:1.5;">3×5 grid · 20 paylines · wild substitution · up to 15 cascade levels per bet</p>
+                        </div>
+                        <div class="metric-card" style="padding:1rem;">
+                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+                                <span style="background:#10b981;padding:0.2rem 0.55rem;border-radius:6px;font-size:0.75rem;font-family:'Space Grotesk',sans-serif;font-weight:700;">FREE</span>
+                                <strong style="color:white;">Free Spins</strong>
+                            </div>
+                            <p style="color:var(--text-secondary);font-size:0.85rem;line-height:1.5;">3+ SC anywhere → 10 spins at 2× · retrigger capped at 100 total spins · H&amp;S excluded</p>
+                        </div>
+                        <div class="metric-card" style="padding:1rem;">
+                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+                                <span style="background:#f59e0b;padding:0.2rem 0.55rem;border-radius:6px;font-size:0.75rem;font-family:'Space Grotesk',sans-serif;font-weight:700;color:#000;">H&amp;S</span>
+                                <strong style="color:white;">Hold &amp; Spin</strong>
+                            </div>
+                            <p style="color:var(--text-secondary);font-size:0.85rem;line-height:1.5;">6+ CO → coins lock · 3 lives reset per new coin · Mini / Minor / Major / Grand tiers · full screen = Grand</p>
+                        </div>
+                        <div class="metric-card" style="padding:1rem;">
+                            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;">
+                                <span style="background:#ec4899;padding:0.2rem 0.55rem;border-radius:6px;font-size:0.75rem;font-family:'Space Grotesk',sans-serif;font-weight:700;">BUY</span>
+                                <strong style="color:white;">Feature Buy</strong>
+                            </div>
+                            <p style="color:var(--text-secondary);font-size:0.85rem;line-height:1.5;">100× bet · guarantees H&amp;S with 6 coins pre-locked · calibrated to ≈95% RTP on cost</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel" style="margin-bottom:0;">
+                    <h2 style="margin-bottom:1.25rem;">📐 Math Reference</h2>
+
+                    <div style="display:flex;flex-direction:column;gap:0.75rem;">
+                        <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
+                            <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">RTP (Return to Player)</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">total_win ÷ total_wagered</div>
+                            <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Decomposed into Base + Bonus + H&amp;S. Target ≈ 95% — house edge = 5%.</div>
+                        </div>
+                        <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
+                            <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">Volatility Index</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">√(variance) ÷ bet</div>
+                            <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Variance computed via Welford's online algorithm — numerically stable at 10M+ spins.</div>
+                        </div>
+                        <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
+                            <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">Hit Rate</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">spins_with_payout &gt; 0 ÷ total_spins</div>
+                            <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Elevated by cascades — a single bet can count as a hit across multiple cascade levels.</div>
+                        </div>
+                        <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
+                            <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">Win Buckets</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">0× / 0–1× / 1–5× / 5–15× / 15–50× / 50×+</div>
+                            <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Log-scale distribution. Regulatory jurisdictions often mandate maximum bucket caps.</div>
+                        </div>
+                        <div>
+                            <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">Trigger Frequency</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">total_spins ÷ trigger_count</div>
+                            <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Reported as "1 in X" for Free Spins, H&amp;S, and Grand Jackpot separately.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance stats -->
+            <section class="glass-panel" style="margin-bottom:1.5rem;">
+                <h2 style="text-align:center;margin-bottom:1.75rem;">⚡ Performance Architecture</h2>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.25rem;text-align:center;">
+                    <div class="metric-card" style="padding:1.25rem;">
+                        <div style="font-size:2rem;font-weight:800;font-family:'Space Grotesk',sans-serif;color:var(--primary-color);margin-bottom:0.3rem;">Web Worker</div>
+                        <div style="color:var(--text-secondary);font-size:0.84rem;">Simulation runs off the main thread. UI stays responsive at any spin count.</div>
+                    </div>
+                    <div class="metric-card" style="padding:1.25rem;">
+                        <div style="font-size:2rem;font-weight:800;font-family:'Space Grotesk',sans-serif;color:var(--primary-color);margin-bottom:0.3rem;">Uint8Array</div>
+                        <div style="color:var(--text-secondary);font-size:0.84rem;">Reel pools stored as typed byte arrays. 8× smaller, fits in L1 cache.</div>
+                    </div>
+                    <div class="metric-card" style="padding:1.25rem;">
+                        <div style="font-size:2rem;font-weight:800;font-family:'Space Grotesk',sans-serif;color:#10b981;margin-bottom:0.3rem;">~5× Python</div>
+                        <div style="color:var(--text-secondary);font-size:0.84rem;">Batch RNG + local var caching in the Python engine's hot loop.</div>
+                    </div>
+                    <div class="metric-card" style="padding:1.25rem;">
+                        <div style="font-size:2rem;font-weight:800;font-family:'Space Grotesk',sans-serif;color:#10b981;margin-bottom:0.3rem;">40 Tests</div>
+                        <div style="color:var(--text-secondary);font-size:0.84rem;">Full unit test coverage: paytable, evaluators, bonus, H&amp;S, reel engine.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tech stack + GitHub CTA -->
+            <section class="glass-panel text-center">
+                <h2 style="margin-bottom:1rem;">Tech Stack</h2>
+                <div style="display:flex;flex-wrap:wrap;gap:0.6rem;justify-content:center;margin-bottom:2rem;">
+                    <span style="padding:0.35rem 0.9rem;background:rgba(55,126,184,0.2);border:1px solid rgba(55,126,184,0.4);border-radius:20px;font-size:0.85rem;color:#60a5fa;">Python 3.9+</span>
+                    <span style="padding:0.35rem 0.9rem;background:rgba(247,223,30,0.1);border:1px solid rgba(247,223,30,0.3);border-radius:20px;font-size:0.85rem;color:#fbbf24;">JavaScript ES2020</span>
+                    <span style="padding:0.35rem 0.9rem;background:rgba(139,92,246,0.2);border:1px solid rgba(139,92,246,0.4);border-radius:20px;font-size:0.85rem;color:#a78bfa;">Web Workers API</span>
+                    <span style="padding:0.35rem 0.9rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);border-radius:20px;font-size:0.85rem;color:#34d399;">Chart.js</span>
+                    <span style="padding:0.35rem 0.9rem;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:20px;font-size:0.85rem;color:#94a3b8;">multiprocessing</span>
+                    <span style="padding:0.35rem 0.9rem;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:20px;font-size:0.85rem;color:#94a3b8;">Welford Variance</span>
+                    <span style="padding:0.35rem 0.9rem;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:20px;font-size:0.85rem;color:#94a3b8;">Monte Carlo</span>
+                    <span style="padding:0.35rem 0.9rem;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:20px;font-size:0.85rem;color:#94a3b8;">Uint8Array RNG</span>
+                </div>
+                <p style="color:var(--text-secondary);margin-bottom:1.5rem;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.6;">
+                    Python engine includes multiprocessing, binary-search RTP tuner, Matplotlib charts, and 40 unit tests. Open source under MIT license.
+                </p>
+                <a href="https://github.com/Doublew08/slot-simulation-engine" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:0.6rem;padding:0.8rem 2rem;background:var(--primary-color);color:white;border-radius:12px;text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:1rem;box-shadow:0 0 20px rgba(139,92,246,0.4);">
+                    ★ Star on GitHub
+                </a>
+            </section>
+
         </div>
 
         <!-- Session Simulator Tab -->
