@@ -41,13 +41,15 @@ except ImportError:
 app = FastAPI(title="Slot Simulation API", docs_url="/api/docs")
 
 _result_cache: dict = {}
-_ip_hits: dict = defaultdict(list)
-_RATE_WINDOW = 60  # seconds
-_CACHE_MAX   = 100
+_ip_hits: dict      = defaultdict(list)
+_rate_lock           = threading.Lock()   # guards atomic read-modify-write on _ip_hits
+_RATE_WINDOW         = 60   # seconds
+_RATE_MAX_KEYS       = 5_000  # evict all entries if dict grows past this (DoS guard)
+_CACHE_MAX           = 100
 
 def _cache_key(req) -> str:
     raw = f"{req.num_spins}:{req.seed}:{req.wild_weight}"
-    return hashlib.md5(raw.encode()).hexdigest()
+    return hashlib.sha256(raw.encode()).hexdigest()  # SHA-256; MD5 is broken
 
 def _cache_set(key: str, value: dict) -> None:
     if len(_result_cache) >= _CACHE_MAX:
@@ -57,11 +59,15 @@ def _cache_set(key: str, value: dict) -> None:
 def _check_rate(ip: str, bucket: str, max_req: int) -> None:
     key = f"{ip}:{bucket}"
     now = time.time()
-    hits = [t for t in _ip_hits[key] if now - t < _RATE_WINDOW]
-    if len(hits) >= max_req:
-        raise HTTPException(status_code=429, detail=f"Rate limit: max {max_req} requests per minute.")
-    hits.append(now)
-    _ip_hits[key] = hits
+    with _rate_lock:
+        # Evict entire dict if it grows unboundedly (memory DoS guard)
+        if len(_ip_hits) > _RATE_MAX_KEYS:
+            _ip_hits.clear()
+        hits = [t for t in _ip_hits[key] if now - t < _RATE_WINDOW]
+        if len(hits) >= max_req:
+            raise HTTPException(status_code=429, detail=f"Rate limit: max {max_req} requests per minute.")
+        hits.append(now)
+        _ip_hits[key] = hits
 
 app.add_middleware(
     CORSMiddleware,

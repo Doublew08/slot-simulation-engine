@@ -87,19 +87,29 @@ document.addEventListener('DOMContentLoaded', () => {
         high: { "W": 0.5, "H1": 1, "H2": 1, "M1": 2, "M2": 2, "L1": 40, "L2": 45, "SC": 0.5, "CO": 1 }
     };
     
+    const ALLOWED_SYMS = ["W","H1","H2","M1","M2","L1","L2","SC","CO"];
+
     function renderEditor(weights) {
         editorGrid.innerHTML = '';
-        for (let sym in weights) {
-            let card = document.createElement('div');
+        for (const sym of ALLOWED_SYMS) {
+            if (!(sym in weights)) continue;
+            const card = document.createElement('div');
             card.className = 'editor-card';
-            card.innerHTML = `
-                <h4>${sym}</h4>
-                <input type="number" id="weight_${sym}" value="${weights[sym]}" step="0.1" min="0">
-            `;
+
+            const h4 = document.createElement('h4');
+            h4.textContent = sym;                       // textContent — no XSS
+
+            const inp = document.createElement('input');
+            inp.type = 'number';
+            inp.id   = `weight_${sym}`;
+            inp.setAttribute('value', String(Number(weights[sym])));
+            inp.step = '0.1';
+            inp.min  = '0';
+            inp.addEventListener('change', updateDocumentation);
+
+            card.appendChild(h4);
+            card.appendChild(inp);
             editorGrid.appendChild(card);
-            
-            // Add listener to update documentation when weight changes
-            document.getElementById(`weight_${sym}`).addEventListener('change', updateDocumentation);
         }
         updateDocumentation();
     }
@@ -200,7 +210,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!match) return;
         try {
             const cfg = JSON.parse(atob(decodeURIComponent(match[1])));
-            const ALLOWED_SYMS = new Set(["W","H1","H2","M1","M2","L1","L2","SC","CO"]);
+            const _SYM_SET = new Set(ALLOWED_SYMS);
             if (Number.isFinite(cfg.spins) && cfg.spins > 0)
                 document.getElementById('numSpins').value = Math.max(1000, Math.min(50_000_000, cfg.spins));
             if (Number.isFinite(cfg.coinProb))
@@ -209,7 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('bonusBuyMode').checked = cfg.bonusBuy;
             if (cfg.weights && typeof cfg.weights === 'object' && !Array.isArray(cfg.weights)) {
                 const safe = {};
-                for (const sym of ALLOWED_SYMS) {
+                for (const sym of _SYM_SET) {
                     const v = cfg.weights[sym];
                     if (Number.isFinite(v) && v >= 0) safe[sym] = v;
                 }

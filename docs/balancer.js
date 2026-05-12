@@ -23,7 +23,26 @@ function initChart(targetRtp) {
                     borderWidth: 2,
                     fill: true,
                     tension: 0.1,
-                    pointRadius: 2,
+                    pointRadius: 3,
+                },
+                {
+                    label: '95% CI upper',
+                    data: [],
+                    borderColor: 'rgba(96,165,250,0.3)',
+                    borderWidth: 1,
+                    borderDash: [2, 2],
+                    pointRadius: 0,
+                    fill: false,
+                },
+                {
+                    label: '95% CI lower',
+                    data: [],
+                    borderColor: 'rgba(96,165,250,0.3)',
+                    borderWidth: 1,
+                    borderDash: [2, 2],
+                    pointRadius: 0,
+                    fill: '-1',
+                    backgroundColor: 'rgba(96,165,250,0.06)',
                 },
                 {
                     label: `Target ${targetRtp.toFixed(2)}%`,
@@ -41,8 +60,8 @@ function initChart(targetRtp) {
             maintainAspectRatio: false,
             animation: false,
             plugins: {
-                title: { display: true, text: 'Robbins-Monro Convergence', font: { size: 16 } },
-                legend: { display: true },
+                title: { display: true, text: 'Robbins-Monro Convergence (shaded = 95% CI)', font: { size: 16 } },
+                legend: { display: false },
             },
             scales: {
                 y: { grid: { color: 'rgba(255,255,255,0.05)' } },
@@ -51,12 +70,14 @@ function initChart(targetRtp) {
     });
 }
 
-function pushChartPoint(iter, rtp, targetRtp) {
+function pushChartPoint(iter, rtp, ci, targetRtp) {
     if (!fitnessChartInstance) return;
     const c = fitnessChartInstance;
     c.data.labels.push(`Iter ${iter}`);
     c.data.datasets[0].data.push(rtp);
-    c.data.datasets[1].data.push(targetRtp);
+    c.data.datasets[1].data.push(rtp + ci * 100);
+    c.data.datasets[2].data.push(rtp - ci * 100);
+    c.data.datasets[3].data.push(targetRtp);
     c.update('none');
 }
 
@@ -110,8 +131,10 @@ function runRobbinsMonro(targetRtp, maxIter, spinsPerEval) {
         worker.onmessage = (e) => {
             const msg = e.data;
             if (msg.type === 'progress') {
-                pushChartPoint(msg.iter, msg.rtp * 100, targetRtp * 100);
-                setProgress((msg.iter / msg.total) * 100, `Iteration ${msg.iter} / ${msg.total}`);
+                pushChartPoint(msg.iter, msg.rtp * 100, msg.rtp_ci || 0, targetRtp * 100);
+                const spinsK = msg.spins_used ? `${(msg.spins_used / 1000).toFixed(0)}K spins` : '';
+                setProgress((msg.iter / msg.total) * 100,
+                    `Iteration ${msg.iter} / ${msg.total}  ${spinsK}`);
                 updateMetrics(msg.rtp, msg.fitness, msg.best_x);
             } else if (msg.type === 'done') {
                 activeWorker = null;
