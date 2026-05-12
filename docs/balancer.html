@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Genetic Auto-Balancer | Slot Engine</title>
+    <title>CMA-ES Auto-Balancer | Slot Engine</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
     <!-- Google Fonts -->
@@ -29,8 +29,8 @@
         </div>
 
         <header class="glass-panel text-center">
-            <h1>GENETIC AUTO-BALANCER</h1>
-            <p>ML Optimization Studio — JS Genetic Algorithm &amp; Python CMA-ES</p>
+            <h1>CMA-ES AUTO-BALANCER</h1>
+            <p>Covariance Matrix Adaptation — Browser JS or Python Server</p>
         </header>
 
         <div class="dashboard">
@@ -38,14 +38,18 @@
             <section class="glass-panel controls-panel">
                 <h2>Optimizer Mode</h2>
 
-                <!-- Mode toggle -->
                 <div class="backend-toggle" style="margin-bottom: 1.5rem;">
-                    <button id="modeJsBtn"  class="btn-secondary active" style="margin-right:0.5rem;">JS Genetic</button>
-                    <button id="modePyBtn"  class="btn-secondary">Python CMA-ES</button>
+                    <button id="modeJsBtn" class="btn-secondary active" style="margin-right:0.5rem;">JS CMA-ES</button>
+                    <button id="modePyBtn" class="btn-secondary">Python CMA-ES</button>
                     <br>
                     <small id="modeStatus" style="color:#94a3b8; margin-top:0.4rem; display:block;">
-                        Browser-side genetic algorithm (no server required)
+                        Browser CMA-ES — no server required, runs in JS
                     </small>
+                </div>
+
+                <!-- Python-only notice (hidden in JS mode) -->
+                <div id="pyNotice" style="display:none; padding:0.6rem 0.8rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; margin-bottom:1rem; font-size:0.82rem; color:#fcd34d;">
+                    Requires Python server running locally or on Render.
                 </div>
 
                 <h2>Parameters</h2>
@@ -56,51 +60,26 @@
                     <small>Mathematical target for the optimizer.</small>
                 </div>
 
-                <!-- JS-only options -->
-                <div id="jsOptions">
-                    <div class="form-group">
-                        <label for="popSize">Population Size</label>
-                        <input type="number" id="popSize" value="10" min="2" max="50" step="1">
-                        <small>Distinct weight sets bred per generation.</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="generations">Generations to Evolve</label>
-                        <input type="number" id="generations" value="10" min="1" max="50" step="1">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="spinsPerTest">Spins per Individual</label>
-                        <input type="number" id="spinsPerTest" value="100000" min="10000" max="1000000" step="10000">
-                        <small>Higher = more accurate fitness, slower evolution.</small>
-                    </div>
+                <div class="form-group">
+                    <label for="maxEvals">Max Evaluations</label>
+                    <input type="number" id="maxEvals" value="80" min="10" max="500" step="10">
+                    <small>Total CMA-ES function evaluations (budget).</small>
                 </div>
 
-                <!-- Python CMA-ES options -->
-                <div id="pyOptions" style="display:none;">
-                    <div style="padding:0.6rem 0.8rem; background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.3); border-radius:8px; margin-bottom:1rem; font-size:0.82rem; color:#fcd34d;">
-                        Requires Python server running locally or on Render.
-                    </div>
-                    <div class="form-group">
-                        <label for="maxEvals">Max Evaluations</label>
-                        <input type="number" id="maxEvals" value="80" min="10" max="500" step="10">
-                        <small>Total CMA-ES function evaluations.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="spinsPerEval">Spins per Evaluation</label>
-                        <input type="number" id="spinsPerEval" value="50000" min="5000" max="200000" step="5000">
-                        <small>Higher = more accurate, slower.</small>
-                    </div>
+                <div class="form-group">
+                    <label for="spinsPerEval">Spins per Evaluation</label>
+                    <input type="number" id="spinsPerEval" value="50000" min="5000" max="200000" step="5000">
+                    <small>Higher = more accurate fitness estimate, slower.</small>
                 </div>
 
                 <button id="runEvolveBtn" class="btn-primary">
-                    <span class="btn-text" id="evolveBtnText">INITIATE EVOLUTION</span>
+                    <span class="btn-text" id="evolveBtnText">INITIATE OPTIMIZATION</span>
                     <span class="loader" id="evolveBtnLoader" style="display: none;"></span>
                 </button>
 
                 <div class="progress-container" id="evolveProgressContainer" style="display: none;">
                     <div class="progress-bar" id="evolveProgressBar"></div>
-                    <span class="progress-text" id="evolveProgressText">Generation 0 / 10</span>
+                    <span class="progress-text" id="evolveProgressText">Evaluation 0 / 80</span>
                 </div>
             </section>
 
@@ -118,7 +97,7 @@
                         <p class="metric-value" id="mError" style="color: #fbbf24;">--%</p>
                     </div>
                     <div class="metric-card">
-                        <h3 id="mGenLabel">Generations Run</h3>
+                        <h3 id="mGenLabel">Evaluations</h3>
                         <p class="metric-value" id="mGenCount">--</p>
                     </div>
                 </div>
