@@ -30,13 +30,15 @@ class BonusFeature:
         return scatter_count >= self.trigger_count
 
     def run_free_spins(
-        self, base_reel_engine: ReelEngine, evaluator: BaseEvaluator
+        self, base_reel_engine: ReelEngine, evaluator: BaseEvaluator,
+        cascade_fn=None,
     ) -> Tuple[float, int]:
         """
         Runs the free-spins loop.
 
-        Uses bonus_reel_engine if configured, otherwise base_reel_engine.
-        Caps total spins at max_total_spins to prevent infinite retrigger loops.
+        cascade_fn: optional callable(grid) -> (line_payout, sc_count, sc_pay).
+        When provided, each spin applies the cascade tumble mechanic (matching
+        the JS engine). When None, falls back to single-evaluation per spin.
 
         Returns (total_payout_multiplier, spins_played).
         """
@@ -51,12 +53,12 @@ class BonusFeature:
 
             grid = reel_engine.spin()
 
-            spin_payout, _ = evaluator.evaluate(grid)
-            scatter_count, scatter_payout = evaluator.evaluate_scatters(grid)
+            if cascade_fn is not None:
+                spin_payout, scatter_count, scatter_payout = cascade_fn(grid)
+            else:
+                spin_payout, _ = evaluator.evaluate(grid)
+                scatter_count, scatter_payout = evaluator.evaluate_scatters(grid)
 
-            # Multiplier applies to line/ways wins only.
-            # Scatter pays face value (not multiplied) — intentional: scatters
-            # pay a fixed total regardless of the free-spin multiplier.
             total_payout += (spin_payout * self.multiplier) + scatter_payout
 
             if self.check_trigger(scatter_count):

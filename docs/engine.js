@@ -188,17 +188,15 @@ class Simulation {
     }
     
     setupGame(customWeights, coinProbability) {
-        // Payouts scaled ×0.88 vs original to price in cascade depth.
-        // Cascade tumble mechanic adds ~12% phantom RTP over a no-cascade baseline.
         let symbols = [
-            new SymbolDef("W",  {3: 0.22, 4: 0.88, 5: 3.50}, true),
-            new SymbolDef("H1", {3: 0.18, 4: 0.66, 5: 1.75}),
-            new SymbolDef("H2", {3: 0.13, 4: 0.44, 5: 1.30}),
-            new SymbolDef("M1", {3: 0.09, 4: 0.35, 5: 0.88}),
-            new SymbolDef("M2", {3: 0.09, 4: 0.26, 5: 0.70}),
-            new SymbolDef("L1", {3: 0.044, 4: 0.18, 5: 0.44}),
-            new SymbolDef("L2", {3: 0.044, 4: 0.13, 5: 0.35}),
-            new SymbolDef("SC", {3: 1.0, 4: 4.0, 5: 20.0}, false, true),
+            new SymbolDef("W",  {3: 0.5,  4: 2.0,  5: 10.0}, true),
+            new SymbolDef("H1", {3: 0.4,  4: 1.5,  5:  5.0}),
+            new SymbolDef("H2", {3: 0.3,  4: 1.0,  5:  4.0}),
+            new SymbolDef("M1", {3: 0.2,  4: 0.8,  5:  2.5}),
+            new SymbolDef("M2", {3: 0.2,  4: 0.6,  5:  2.0}),
+            new SymbolDef("L1", {3: 0.1,  4: 0.4,  5:  1.5}),
+            new SymbolDef("L2", {3: 0.1,  4: 0.3,  5:  1.0}),
+            new SymbolDef("SC", {3: 2.0,  4: 10.0, 5: 50.0}, false, true),
             new SymbolDef("CO", {}, false, false, true)
         ];
         this.paytable = new Paytable(symbols);
