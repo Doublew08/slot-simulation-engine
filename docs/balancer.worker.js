@@ -78,10 +78,13 @@ self.onmessage = function (e) {
                 spins_used:  spins,
             });
 
-            if (fitness < 0.001) break; // converged within 0.1%
+            // Statistical stopping — target already within measurement uncertainty
+            if (fitness < 0.001 || (ci > 0 && fitness < ci)) break;
 
+            // Gradient clipping — prevents boundary-slam on first iterations
+            const clippedError = Math.sign(error) * Math.min(Math.abs(error), 0.5);
             const step = C / Math.pow(k, ALPHA);
-            x = Math.max(0.3, Math.min(20.0, x - step * error));
+            x = Math.max(0.3, Math.min(20.0, x - step * clippedError));
         }
 
         // Final estimate: average of last 5 iterates (Polyak-Ruppert)

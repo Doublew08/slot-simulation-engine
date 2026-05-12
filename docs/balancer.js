@@ -163,9 +163,12 @@ function runRobbinsMonro(targetRtp, maxIter, spinsPerEval) {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('runEvolveBtn').addEventListener('click', async () => {
-        const targetRtp    = parseFloat(document.getElementById('targetRtp').value)    / 100 || 0.96;
-        const maxIter      = parseInt(document.getElementById('maxIter').value)               || 30;
-        const spinsPerEval = parseInt(document.getElementById('spinsPerEval').value)          || 100_000;
+        const targetRtp    = Math.max(0.50, Math.min(1.50,
+                                parseFloat(document.getElementById('targetRtp').value) / 100 || 0.96));
+        const maxIter      = Math.max(5, Math.min(100,
+                                parseInt(document.getElementById('maxIter').value)      || 30));
+        const spinsPerEval = Math.max(50_000, Math.min(1_000_000,
+                                parseInt(document.getElementById('spinsPerEval').value) || 100_000));
         setRunning(true);
 
         try {

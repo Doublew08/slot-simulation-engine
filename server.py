@@ -41,6 +41,7 @@ except ImportError:
 app = FastAPI(title="Slot Simulation API", docs_url="/api/docs")
 
 _result_cache: dict = {}
+_cache_lock          = threading.Lock()   # guards _result_cache across daemon threads
 _ip_hits: dict      = defaultdict(list)
 _rate_lock           = threading.Lock()   # guards atomic read-modify-write on _ip_hits
 _RATE_WINDOW         = 60   # seconds
@@ -52,9 +53,14 @@ def _cache_key(req) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()  # SHA-256; MD5 is broken
 
 def _cache_set(key: str, value: dict) -> None:
-    if len(_result_cache) >= _CACHE_MAX:
-        _result_cache.pop(next(iter(_result_cache)))  # FIFO eviction
-    _result_cache[key] = value
+    with _cache_lock:
+        if len(_result_cache) >= _CACHE_MAX:
+            _result_cache.pop(next(iter(_result_cache)))  # FIFO eviction
+        _result_cache[key] = value
+
+def _cache_get(key: str):
+    with _cache_lock:
+        return _result_cache.get(key)
 
 def _check_rate(ip: str, bucket: str, max_req: int) -> None:
     key = f"{ip}:{bucket}"
@@ -81,14 +87,29 @@ app.add_middleware(
     allow_headers=["Content-Type"],
 )
 
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"]         = "DENY"
+    response.headers["Referrer-Policy"]          = "strict-origin-when-cross-origin"
+    return response
+
+def _real_ip(request: Request) -> str:
+    """Return client IP, trusting X-Forwarded-For from Render's proxy."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
 SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
 
 
 class SimulateRequest(BaseModel):
-    num_spins:   Annotated[int,   Field(ge=1, le=10_000_000)] = 1_000_000
-    seed:        Optional[int]  = None
-    workers:     int            = 1
-    wild_weight: Annotated[float, Field(gt=0, le=50.0)]      = 4.238
+    num_spins:   Annotated[int,   Field(ge=1, le=10_000_000)]  = 1_000_000
+    seed:        Optional[int]                                  = None
+    workers:     Annotated[int,   Field(ge=1, le=4)]           = 1
+    wild_weight: Annotated[float, Field(gt=0, le=50.0)]        = 4.238
 
 
 def _build_with_weights(weights: dict):
@@ -157,10 +178,11 @@ def health():
 
 @app.post("/api/simulate")
 async def simulate(req: SimulateRequest, request: Request):
-    _check_rate(request.client.host, "sim", 10)
-    key = _cache_key(req)
-    if key in _result_cache:
-        return _result_cache[key]
+    _check_rate(_real_ip(request), "sim", 10)
+    key    = _cache_key(req)
+    cached = _cache_get(key)
+    if cached:
+        return cached
 
     loop = asyncio.get_event_loop()
     future: asyncio.Future = loop.create_future()
@@ -216,7 +238,7 @@ async def simulate(req: SimulateRequest, request: Request):
 
 @app.post("/api/tune")
 async def tune(req: TuneRequest, request: Request):
-    _check_rate(request.client.host, "tune", 3)
+    _check_rate(_real_ip(request), "tune", 3)
     loop = asyncio.get_event_loop()
     aq: asyncio.Queue = asyncio.Queue()
 
@@ -292,7 +314,7 @@ async def tune(req: TuneRequest, request: Request):
 async def balance(req: BalanceRequest, request: Request):
     if not CMA_AVAILABLE:
         raise HTTPException(status_code=501, detail="cma not installed — pip install cma")
-    _check_rate(request.client.host, "balance", 2)
+    _check_rate(_real_ip(request), "balance", 2)
     loop = asyncio.get_event_loop()
     aq: asyncio.Queue = asyncio.Queue()
 
