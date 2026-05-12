@@ -120,24 +120,36 @@ function setConnStatus(state) {
     const el = document.getElementById('connStatus');
     if (!el) return;
     const map = {
-        checking:      { text: 'Checking…',      color: '#94a3b8' },
-        connected:     { text: 'Connected',       color: '#10b981' },
-        offline:       { text: 'Server offline',  color: '#ef4444' },
-        local_hint:    { text: 'Run: python server.py', color: '#60a5fa' },
+        checking:   { text: 'Checking…',       color: '#94a3b8' },
+        warming:    { text: 'Warming up…',      color: '#f59e0b' },
+        connected:  { text: 'Connected',        color: '#10b981' },
+        offline:    { text: 'Server offline',   color: '#ef4444' },
     };
     const s = map[state] || map.checking;
-    el.textContent  = s.text;
-    el.style.color  = s.color;
+    el.textContent = s.text;
+    el.style.color = s.color;
 }
 
 async function pingServer() {
     setConnStatus('checking');
+    // First fast check (5s) — already warm?
     try {
-        const res = await fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(6000) });
+        const res = await fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(5000) });
+        if (res.ok) { setConnStatus('connected'); return; }
+    } catch {}
+    // Cold start — Render can take up to 60s to wake
+    setConnStatus('warming');
+    try {
+        const res = await fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(65000) });
         setConnStatus(res.ok ? 'connected' : 'offline');
     } catch {
-        setConnStatus(IS_LOCAL ? 'local_hint' : 'offline');
+        setConnStatus('offline');
     }
+}
+
+// Warmup ping on page load (non-localhost) so server is ready before user clicks
+if (!IS_LOCAL) {
+    fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(65000) }).catch(() => {});
 }
 
 // ── JS CMA-ES via Worker ───────────────────────────────────────────────────
@@ -259,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
             modePyBtn.classList.add('active');
             modeJsBtn.classList.remove('active');
             pyNotice.style.display = '';
-            modeStatus.textContent = 'Python CMA-ES — server-side optimizer';
+            modeStatus.textContent = 'Python CMA-ES — runs on Render, no setup needed';
             pingServer(); // check connection when user switches to Python mode
         }
     }
