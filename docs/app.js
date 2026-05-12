@@ -225,12 +225,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (Object.keys(safe).length > 0) renderEditor(safe);
             }
-            // Toast so the user knows the shared config was applied
-            const toast = document.createElement('div');
-            toast.textContent = '🔗 Shared config loaded — hit Run to simulate';
-            toast.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:0.7rem 1.4rem;border-radius:10px;border:1px solid rgba(139,92,246,0.4);font-family:Space Grotesk,sans-serif;font-size:0.9rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 4000);
+            // Auto-run if the link came from the balancer (autorun flag)
+            if (cfg.autorun === true) {
+                setTimeout(() => runBtn.click(), 150);
+                const toast = document.createElement('div');
+                toast.textContent = '⚖️ Balancer weights loaded — running simulation…';
+                toast.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:0.7rem 1.4rem;border-radius:10px;border:1px solid rgba(139,92,246,0.4);font-family:Space Grotesk,sans-serif;font-size:0.9rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+            } else {
+                const toast = document.createElement('div');
+                toast.textContent = '🔗 Shared config loaded — hit Run to simulate';
+                toast.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:0.7rem 1.4rem;border-radius:10px;border:1px solid rgba(139,92,246,0.4);font-family:Space Grotesk,sans-serif;font-size:0.9rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 4000);
+            }
         } catch (_) {}
     }
 
