@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: slot-simulation-engine
+    env: python
+    plan: free
+    buildCommand: pip install fastapi "uvicorn[standard]"
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
