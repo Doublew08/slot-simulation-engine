@@ -40,7 +40,7 @@ Built for math designers who need numbers fast, not stories.
 | 🐍 **Python API backend** | FastAPI on Render — swap engine via toggle, results cached |
 | 💾 **Simulation history** | Last 10 runs stored in `localStorage`; one-click re-run |
 | 🔗 **Share URL** | Encode full config into a URL hash; anyone with the link loads it instantly |
-| 🧬 **Genetic auto-balancer** | Evolve symbol weights toward a target RTP using crossover + mutation |
+| 🧬 **Genetic auto-balancer** | JS BLX-α GA with fitness sharing **or** Python CMA-ES via `/api/balance` SSE |
 | 🔐 **Security hardened** | CORS restriction, per-IP rate limiting, Pydantic input bounds, XSS-safe DOM |
 | ✅ **46 unit + integration tests** | Full coverage including end-to-end `SimulationRunner` pipeline |
 
@@ -68,7 +68,7 @@ slot-simulation-engine/
     ├── balancer.html    Genetic auto-balancer studio
     ├── engine.js        JS port of the math engine (cascade, H&S, free spins)
     ├── simulation.worker.js  Web Worker wrapper
-    ├── balancer.js      Genetic algorithm — crossover, mutation, fitness eval
+    ├── balancer.js      JS GA (BLX-α crossover, fitness sharing) + Python CMA-ES client
     └── app.js           UI controller — history, share URL, CI display, backend toggle
 ```
 
@@ -201,6 +201,7 @@ Results exported to results.csv
 | `GET` | `/api/health` | Liveness check |
 | `POST` | `/api/simulate` | Run Monte Carlo simulation |
 | `POST` | `/api/tune` | Binary-search wild weight to target RTP (SSE stream) |
+| `POST` | `/api/balance` | CMA-ES multi-weight optimizer, streams per-eval progress (SSE) |
 
 ### `POST /api/simulate`
 
@@ -298,22 +299,30 @@ HoldAndSpinFeature(
 
 ## Genetic Auto-Balancer
 
-`docs/balancer.html` evolves symbol weights toward a target RTP using a genetic algorithm.
+`docs/balancer.html` offers two optimizer modes:
 
-### Algorithm
+### Mode 1 — JS Genetic Algorithm (browser, no server)
 
-1. **Initialise** — population of N weight-sets; first individual is the baseline, rest are randomized ±50%
-2. **Evaluate** — each individual runs a full Monte Carlo simulation; fitness = `|rtp − target|`
-3. **Select** — tournament selection from top 50%; top 2 pass through unchanged (elitism)
-4. **Crossover** — child inherits each weight randomly from one of two parents
-5. **Mutate** — adaptive rate decays `0.4 → 0.1` over generations (exploration early, refinement late)
-6. **Repeat** — until max generations or error < 0.05%
+1. **Initialise** — population of N weight-sets; first individual is baseline, rest randomized ±50%
+2. **Evaluate** — each individual runs a full JS Monte Carlo simulation; fitness = `|rtp − target|`
+3. **Fitness sharing** — penalise crowded solutions (`σ = 0.3`) so the population stays diverse
+4. **Select** — top half; top 2 pass unchanged (elitism)
+5. **Crossover** — BLX-α blend crossover (`α = 0.5`), samples beyond the parent range for exploration
+6. **Mutate** — adaptive rate decays `0.4 → 0.1` over generations
+7. **Repeat** — until max generations or error < 0.05%
 
-### Output
+### Mode 2 — Python CMA-ES (requires backend, `/api/balance`)
 
-- Live fitness chart showing **best RTP** and **population average RTP** per generation — the gap reveals diversity collapse
-- Optimized weight grid updates each generation
-- **Send to Main Engine** button deep-links the best weights into the simulator via URL hash
+- Optimizes all 9 symbol weights simultaneously in **log-space** (ensures positivity)
+- Uses `cma.CMAEvolutionStrategy` with `popsize=6`, `σ₀=0.3`, up to `max_evals` total evaluations
+- Each evaluation runs `spins_per_eval` spins via `_build_with_weights()` and streams progress via SSE
+- More sample-efficient than GA for continuous optimization; converges in ~50–100 evals
+
+### Shared Output
+
+- Live convergence chart (best RTP vs. each generation/eval) updates in real time
+- Optimized weight grid updates every generation/evaluation
+- **Send to Main Engine** button deep-links best weights into the simulator via URL hash
 
 ---
 
@@ -376,6 +385,7 @@ HoldAndSpinFeature(
 
 - `POST /api/simulate` — runs the Python engine in a daemon thread; result returned as plain JSON (SSE-free, proxy-safe)
 - `POST /api/tune` — binary-search tuner streamed as Server-Sent Events
+- `POST /api/balance` — CMA-ES multi-weight optimizer; streams one SSE event per evaluation; uses `_build_with_weights()` to construct a full `SimulationRunner` from arbitrary 9-symbol weight dicts; requires `pip install cma`
 - In-memory result cache: FIFO, 100-entry cap, keyed by MD5 of `(num_spins, seed, wild_weight)`
 - Per-IP rate limiter with 60 s sliding window
 - All inputs validated via Pydantic `Field` constraints
