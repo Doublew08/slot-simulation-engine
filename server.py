@@ -37,10 +37,16 @@ app = FastAPI(title="Slot Simulation API", docs_url="/api/docs")
 _result_cache: dict = {}
 _ip_hits: dict = defaultdict(list)
 _RATE_WINDOW = 60  # seconds
+_CACHE_MAX   = 100
 
 def _cache_key(req) -> str:
     raw = f"{req.num_spins}:{req.seed}:{req.wild_weight}"
     return hashlib.md5(raw.encode()).hexdigest()
+
+def _cache_set(key: str, value: dict) -> None:
+    if len(_result_cache) >= _CACHE_MAX:
+        _result_cache.pop(next(iter(_result_cache)))  # FIFO eviction
+    _result_cache[key] = value
 
 def _check_rate(ip: str, bucket: str, max_req: int) -> None:
     key = f"{ip}:{bucket}"
@@ -136,7 +142,7 @@ async def simulate(req: SimulateRequest, request: Request):
                 "avg_jackpot":     None,
                 "backend":         "python",
             }
-            _result_cache[key] = result
+            _cache_set(key, result)
             loop.call_soon_threadsafe(future.set_result, result)
 
         except Exception as exc:

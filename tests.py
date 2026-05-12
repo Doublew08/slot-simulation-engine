@@ -424,5 +424,50 @@ class TestReels(unittest.TestCase):
                 self.assertGreater(len(sym), 0)
 
 
+# ── SimulationRunner integration ─────────────────────────────────────────────
+
+def _build_runner():
+    from main import build_game
+    return build_game()
+
+
+class TestSimulationRunner(unittest.TestCase):
+    """End-to-end tests for the full pipeline. Catches wiring bugs that unit
+    tests miss (e.g. a missing local alias inside _run_batch)."""
+
+    def test_basic_metrics_in_range(self):
+        metrics = _build_runner().run(num_spins=10_000, output_csv=None, seed=42)
+        self.assertGreater(metrics["Total RTP"], 0.0)
+        self.assertLess(metrics["Total RTP"], 2.0)
+        self.assertGreater(metrics["Base Hit Rate"], 0.0)
+
+    def test_seeded_run_reproducible(self):
+        m1 = _build_runner().run(num_spins=5_000, output_csv=None, seed=99)
+        m2 = _build_runner().run(num_spins=5_000, output_csv=None, seed=99)
+        self.assertAlmostEqual(m1["Total RTP"], m2["Total RTP"], places=10)
+
+    def test_rtp_ci_present_and_plausible(self):
+        metrics = _build_runner().run(num_spins=10_000, output_csv=None, seed=1)
+        ci = metrics["RTP CI 95%"]
+        self.assertGreater(ci, 0.0)
+        self.assertLess(ci, 0.5)
+
+    def test_bonus_and_hs_both_contribute(self):
+        # 100K spins: both features must fire at least once
+        metrics = _build_runner().run(num_spins=100_000, output_csv=None, seed=7)
+        self.assertGreater(metrics["Bonus RTP"], 0.0)
+        self.assertGreater(metrics["Hold and Spin RTP"], 0.0)
+
+    def test_balance_history_populated(self):
+        metrics = _build_runner().run(num_spins=10_000, output_csv=None, seed=3)
+        bh = metrics.get("balance_history", [])
+        self.assertGreater(len(bh), 0)
+
+    def test_bucket_percentages_sum_to_100(self):
+        metrics = _build_runner().run(num_spins=10_000, output_csv=None, seed=5)
+        total = sum(v for k, v in metrics.items() if k.startswith("Bucket:"))
+        self.assertAlmostEqual(total, 100.0, places=6)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
