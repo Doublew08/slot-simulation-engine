@@ -118,6 +118,11 @@ class SimulationRunner:
             ">5x to 15x": 0, ">15x to 50x": 0, ">50x": 0,
         }
 
+        # Sample balance every 1K spins → ~1K points per 1M spins
+        BALANCE_SAMPLE = 1_000
+        balance_history: List[float] = []
+        balance_running = 0.0
+
         # ── Chunked batch RNG ─────────────────────────────────────────────
         # Pre-generate base-game spins CHUNK at a time.  One big
         # random.choices(k=CHUNK×rows) per reel instead of CHUNK small calls.
@@ -190,6 +195,11 @@ class SimulationRunner:
                 elif mult <= 50.0:     buckets[">15x to 50x"] += 1
                 else:                  buckets[">50x"]        += 1
 
+                # Balance random walk (sampled)
+                balance_running += spin_win - bet
+                if spin_idx % BALANCE_SAMPLE == 0:
+                    balance_history.append(round(balance_running, 4))
+
                 # Fine-grained progress every 10K spins (helps slow backends)
                 if progress_cb and spin_idx > 0 and spin_idx % 10_000 == 0:
                     progress_cb(spin_idx / num_spins)
@@ -212,6 +222,7 @@ class SimulationRunner:
             "welf_mean":       welf_mean,
             "welf_M2":         welf_M2,
             "buckets":         buckets,
+            "balance_history": balance_history,
         }
 
     # ── Parallel orchestration ────────────────────────────────────────────────
@@ -265,6 +276,17 @@ class SimulationRunner:
             n     = n_new
 
         merged.update({"welf_n": n, "welf_mean": mean, "welf_M2": M2})
+
+        # Concatenate balance histories — offset each batch so the walk is continuous
+        combined: List[float] = []
+        offset = 0.0
+        for b in batches:
+            bh = b.get("balance_history", [])
+            combined.extend(v + offset for v in bh)
+            if bh:
+                offset += bh[-1]
+        merged["balance_history"] = combined
+
         return merged
 
     # ── Metrics computation ───────────────────────────────────────────────────
@@ -304,6 +326,7 @@ class SimulationRunner:
         for k, v in b["buckets"].items():
             metrics[f"Bucket: {k} (%)"] = (v / num_spins) * 100
 
+        metrics["balance_history"] = b.get("balance_history", [])
         return metrics
 
     # ── Output ────────────────────────────────────────────────────────────────
@@ -311,6 +334,8 @@ class SimulationRunner:
     def _print_results(self, metrics: dict) -> None:
         print("\n--- Simulation Results ---")
         for k, v in metrics.items():
+            if isinstance(v, list):
+                continue
             if "Bucket" in k:
                 print(f"  {k}: {v:.4f}%")
             elif "RTP" in k or "Rate" in k:
