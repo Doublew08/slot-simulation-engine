@@ -64,14 +64,14 @@
 
                 <div class="form-group">
                     <label for="maxEvals">Max Evaluations</label>
-                    <input type="number" id="maxEvals" value="80" min="10" max="500" step="10">
+                    <input type="number" id="maxEvals" value="150" min="10" max="500" step="10">
                     <small>Total CMA-ES function evaluations (budget).</small>
                 </div>
 
                 <div class="form-group">
                     <label for="spinsPerEval">Spins per Evaluation</label>
-                    <input type="number" id="spinsPerEval" value="50000" min="5000" max="200000" step="5000">
-                    <small>Higher = more accurate fitness estimate, slower.</small>
+                    <input type="number" id="spinsPerEval" value="200000" min="50000" max="1000000" step="50000">
+                    <small>High-volatility game — use 200K+ for reliable convergence. Each eval runs 2x and averages to reduce jackpot variance.</small>
                 </div>
 
                 <button id="runEvolveBtn" class="btn-primary">

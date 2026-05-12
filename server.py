@@ -136,8 +136,8 @@ class TuneRequest(BaseModel):
 
 class BalanceRequest(BaseModel):
     target_rtp:     Annotated[float, Field(ge=0.50, le=1.0)]      = 0.95
-    max_evals:      Annotated[int,   Field(ge=10, le=500)]        = 100
-    spins_per_eval: Annotated[int,   Field(ge=5_000, le=200_000)] = 50_000
+    max_evals:      Annotated[int,   Field(ge=10, le=500)]         = 150
+    spins_per_eval: Annotated[int,   Field(ge=50_000, le=500_000)] = 100_000
 
 
 def _sse(msg: dict) -> str:
@@ -301,10 +301,14 @@ async def balance(req: BalanceRequest, request: Request):
                         fitnesses.append(1e9)
                         continue
                     weights = {s: _math.exp(x[i]) for i, s in enumerate(_SYMS)}
-                    runner  = _build_with_weights(weights)
-                    metrics = runner.run(num_spins=req.spins_per_eval, output_csv=None,
-                                        seed=None, workers=1)
-                    rtp     = metrics["Total RTP"]
+                    # Average 2 runs to reduce jackpot-driven variance
+                    _rtps = []
+                    for _ in range(2):
+                        runner  = _build_with_weights(weights)
+                        metrics = runner.run(num_spins=req.spins_per_eval, output_csv=None,
+                                            seed=None, workers=1)
+                        _rtps.append(metrics["Total RTP"])
+                    rtp     = sum(_rtps) / len(_rtps)
                     fitness = abs(rtp - req.target_rtp)
                     fitnesses.append(fitness)
                     eval_count += 1
