@@ -54,7 +54,9 @@ class BonusFeature:
             spin_payout, _ = evaluator.evaluate(grid)
             scatter_count, scatter_payout = evaluator.evaluate_scatters(grid)
 
-            # Multiplier applies to line/ways wins; scatter pays face value
+            # Multiplier applies to line/ways wins only.
+            # Scatter pays face value (not multiplied) — intentional: scatters
+            # pay a fixed total regardless of the free-spin multiplier.
             total_payout += (spin_payout * self.multiplier) + scatter_payout
 
             if self.check_trigger(scatter_count):

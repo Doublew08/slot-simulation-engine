@@ -28,6 +28,9 @@ class HoldAndSpinFeature:
         jackpots: Optional[Dict[str, float]] = None,
         initial_respins: int = 3,
         major_probability: float = 0.0001,
+        coin_weight: int = 100,
+        mini_weight: int = 5,
+        minor_weight: int = 1,
     ):
         self.trigger_count = trigger_count
         self.coin_name = coin_name
@@ -39,8 +42,9 @@ class HoldAndSpinFeature:
 
         # Weighted pool: coin values + Mini/Minor jackpots.
         # Major drawn via separate probability; Grand is full-screen only.
+        # Defaults: Mini ≈ 0.83%, Minor ≈ 0.165% of the pool.
         self._pool_values: List = list(coin_values) + ["Mini", "Minor"]
-        self._pool_weights: List[int] = [100] * len(coin_values) + [5, 1]
+        self._pool_weights: List[int] = [coin_weight] * len(coin_values) + [mini_weight, minor_weight]
 
     def _get_random_coin_value(self) -> float:
         if random.random() < self.major_probability:

@@ -70,7 +70,8 @@ class SimulationRunner:
             batch = self._run_batch(num_spins, verbose=True)
 
         metrics = self._compute_metrics(batch)
-        self._export_csv(output_csv, metrics)
+        if output_csv:
+            self._export_csv(output_csv, metrics)
         self._print_results(metrics)
         return metrics
 
@@ -155,7 +156,7 @@ class SimulationRunner:
                 if bonus and bonus_check(sc_count):
                     bonus_fired    = True
                     bonus_triggers += 1
-                    raw, _  = bonus_run(reel_engine, self.evaluator)
+                    raw, _  = bonus_run(reel_engine, evaluator)
                     bw      = raw * bet
                     bonus_win += bw
                     spin_win  += bw
