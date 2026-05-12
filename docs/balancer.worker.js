@@ -164,10 +164,15 @@ class CMAES {
 
 // ── Simulation helper ──────────────────────────────────────────────────────
 
-function evaluateWeights(weights, numSpins) {
-    const sim = new Simulation();
-    sim.setupGame(weights, 0.05);
-    return sim.runSimulationSync(numSpins, () => {}, false);
+// Average N runs to reduce jackpot-driven variance (high-volatility game)
+function evaluateWeightsAvg(weights, numSpins, repeats) {
+    let total = 0;
+    for (let r = 0; r < repeats; r++) {
+        const sim = new Simulation();
+        sim.setupGame(weights, 0.05);
+        total += sim.runSimulationSync(numSpins, () => {}, false).total_rtp;
+    }
+    return total / repeats;
 }
 
 // ── Main worker loop ───────────────────────────────────────────────────────
@@ -176,6 +181,10 @@ self.onmessage = function (e) {
     if (e.data.type !== 'start') return;
 
     const { targetRtp, maxEvals, spinsPerEval } = e.data;
+    // Average 2 runs per candidate — halves jackpot variance (√2 improvement)
+    // with only 2x cost, worthwhile for high-volatility games with jackpots
+    const REPEATS = 2;
+
     const DEFAULT_W = { W: 4.0, H1: 4.0, H2: 5.0, M1: 6.0, M2: 7.0, L1: 10.0, L2: 12.0, SC: 2.0, CO: 3.0 };
     const x0 = SYMBOLS.map(s => Math.log(DEFAULT_W[s]));
     const es = new CMAES(x0, 0.3);
@@ -187,8 +196,8 @@ self.onmessage = function (e) {
 
     try {
         while (!es.converged() && evalCount < maxEvals) {
-            const xs       = es.ask();
-            const fits     = [];
+            const xs   = es.ask();
+            const fits = [];
 
             for (let k = 0; k < xs.length; k++) {
                 if (evalCount >= maxEvals) { fits.push(1e9); continue; }
@@ -196,8 +205,7 @@ self.onmessage = function (e) {
                 const weights = {};
                 SYMBOLS.forEach((s, i) => { weights[s] = Math.exp(xs[k][i]); });
 
-                const result  = evaluateWeights(weights, spinsPerEval);
-                const rtp     = result.total_rtp;
+                const rtp     = evaluateWeightsAvg(weights, spinsPerEval, REPEATS);
                 const fitness = Math.abs(rtp - targetRtp);
                 fits.push(fitness);
                 evalCount++;
@@ -209,13 +217,13 @@ self.onmessage = function (e) {
                 }
 
                 self.postMessage({
-                    type:      'progress',
-                    eval:      evalCount,
-                    total:     maxEvals,
-                    rtp:       +rtp.toFixed(6),
-                    fitness:   +fitness.toFixed(6),
-                    best_rtp:  +bestRtp.toFixed(6),
-                    weights:   Object.fromEntries(SYMBOLS.map((s, i) => [s, +Math.exp(xs[k][i]).toFixed(4)])),
+                    type:     'progress',
+                    eval:     evalCount,
+                    total:    maxEvals,
+                    rtp:      +rtp.toFixed(6),
+                    fitness:  +fitness.toFixed(6),
+                    best_rtp: +bestRtp.toFixed(6),
+                    weights:  Object.fromEntries(SYMBOLS.map((s, i) => [s, +Math.exp(xs[k][i]).toFixed(4)])),
                 });
 
                 if (bestFitness < 0.0005) break;
