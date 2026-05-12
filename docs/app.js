@@ -693,10 +693,11 @@ function renderCharts(results) {
 
     if (balanceChartInstance) balanceChartInstance.destroy();
     balanceChartInstance = null;
-    const balanceCanvas = document.getElementById('balanceChart');
+    const balanceWrapper = document.getElementById('balanceChartWrapper');
     if (results.balance_history && results.balance_history.length > 0) {
+        balanceWrapper.style.display = '';
         let labels = Array.from({length: results.balance_history.length}, (_, i) => i * (results.num_spins / results.balance_history.length));
-        balanceChartInstance = new Chart(balanceCanvas.getContext('2d'), {
+        balanceChartInstance = new Chart(document.getElementById('balanceChart').getContext('2d'), {
             type: 'line',
             data: {
                 labels: labels,
@@ -722,13 +723,6 @@ function renderCharts(results) {
             }
         });
     } else {
-        const ctx = balanceCanvas.getContext('2d');
-        ctx.clearRect(0, 0, balanceCanvas.width, balanceCanvas.height);
-        ctx.fillStyle = '#334155';
-        ctx.fillRect(0, 0, balanceCanvas.width, balanceCanvas.height);
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '14px Space Grotesk, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Balance history not available in Python backend mode', balanceCanvas.width / 2, balanceCanvas.height / 2);
+        balanceWrapper.style.display = 'none';
     }
 }
