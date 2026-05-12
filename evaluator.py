@@ -50,10 +50,7 @@ class LinesEvaluator(BaseEvaluator):
                 
                 # Special non-wild symbols (like scatters/coins) break lines
                 if self.paytable.is_special(sym) and not self.paytable.is_wild(sym):
-                    if first_sym is None:
-                        break
-                    else:
-                        break
+                    break
 
                 if first_sym is None:
                     if self.paytable.is_wild(sym):
@@ -138,7 +135,7 @@ class WaysEvaluator(BaseEvaluator):
                 else:
                     break
                     
-            if match_count > 0:
+            if match_count >= 3:
                 payout_per_way = self.paytable.payout(symbol.name, match_count)
                 if payout_per_way > 0:
                     total = payout_per_way * ways

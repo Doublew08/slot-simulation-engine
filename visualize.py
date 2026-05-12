@@ -66,11 +66,12 @@ def visualize_results(csv_filename="results.csv", output_image="rtp_chart.png"):
     ax2.set_ylabel("Hit Probability (%)")
     ax2.set_title("Feature Hit Probabilities", fontsize=14, pad=20)
     
-    # Format Y axis to be logarithmic for the probabilities so small ones are visible?
-    # Or just use linear but the small ones might be invisible. 
-    # Let's use a log scale because Hold & Spin is ~0.04% while Base is ~58%
-    ax2.set_yscale('log')
-    ax2.set_ylim(0.01, 100)
+    # Log scale only when all values are positive — zero crashes matplotlib log axis
+    if all(v > 0 for v in bar_values):
+        ax2.set_yscale('log')
+        ax2.set_ylim(0.01, 100)
+    else:
+        ax2.set_ylim(0, max(bar_values) * 1.2 if any(v > 0 for v in bar_values) else 1)
     
     # Add Volatility text box
     volatility = metrics.get('Volatility', 0)
