@@ -224,6 +224,83 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressText = document.getElementById('progressText');
     const exportCsvBtn = document.getElementById('exportCsvBtn');
     const exportJsonBtn = document.getElementById('exportJsonBtn');
+    const shareUrlBtn   = document.getElementById('shareUrlBtn');
+
+    // --- SHARE URL ---
+    function shareConfig() {
+        const config = {
+            spins:    parseInt(document.getElementById('numSpins').value) || 1000000,
+            coinProb: parseFloat(document.getElementById('coinProb').value) || 0.05,
+            bonusBuy: document.getElementById('bonusBuyMode').checked,
+            weights:  getCustomWeights(),
+        };
+        const encoded = btoa(JSON.stringify(config));
+        const url = `${window.location.origin}${window.location.pathname}#sim=${encoded}`;
+        navigator.clipboard.writeText(url).then(() => {
+            shareUrlBtn.textContent = '✓ COPIED!';
+            setTimeout(() => { shareUrlBtn.textContent = '🔗 SHARE CONFIG URL'; }, 2000);
+        }).catch(() => {
+            window.prompt('Copy this URL:', url);
+        });
+    }
+
+    function loadConfigFromUrl() {
+        const match = window.location.hash.match(/#sim=(.+)/);
+        if (!match) return;
+        try {
+            const cfg = JSON.parse(atob(match[1]));
+            if (cfg.spins)              document.getElementById('numSpins').value   = cfg.spins;
+            if (cfg.coinProb !== undefined) document.getElementById('coinProb').value  = cfg.coinProb;
+            if (cfg.bonusBuy !== undefined) document.getElementById('bonusBuyMode').checked = cfg.bonusBuy;
+            if (cfg.weights)            renderEditor(cfg.weights);
+        } catch (_) {}
+    }
+
+    loadConfigFromUrl();
+
+    if (shareUrlBtn) shareUrlBtn.addEventListener('click', shareConfig);
+
+    // --- SIMULATION HISTORY ---
+    const HISTORY_KEY = 'slotSimHistory';
+    const MAX_HISTORY = 10;
+
+    function saveToHistory(results, config) {
+        const entry = { ts: Date.now(), spins: results.num_spins, rtp: results.total_rtp, vol: results.volatility, config };
+        let hist = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        hist.unshift(entry);
+        if (hist.length > MAX_HISTORY) hist = hist.slice(0, MAX_HISTORY);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+        renderHistory();
+    }
+
+    function renderHistory() {
+        const hist = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        const section = document.getElementById('historySection');
+        const list    = document.getElementById('historyList');
+        if (!section || !list) return;
+        if (hist.length === 0) { section.style.display = 'none'; return; }
+        section.style.display = '';
+        list.innerHTML = hist.map(e => `
+            <div class="metric-card" style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;margin-bottom:0.5rem;">
+                <div>
+                    <span style="color:var(--text-secondary);font-size:0.8rem;">${new Date(e.ts).toLocaleString()}</span>
+                    <div style="margin-top:0.2rem;">
+                        <strong style="color:white;">${(e.rtp*100).toFixed(2)}% RTP</strong>
+                        <span style="color:var(--text-secondary);margin-left:0.75rem;">Vol: ${e.vol.toFixed(2)}</span>
+                        <span style="color:var(--text-secondary);margin-left:0.75rem;">${(e.spins/1e6).toFixed(2)}M spins</span>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    const clearHistBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistBtn) clearHistBtn.addEventListener('click', () => {
+        localStorage.removeItem(HISTORY_KEY);
+        renderHistory();
+    });
+
+    renderHistory();
 
     // Fetch simulation from Python backend — plain JSON response (no SSE, proxy-safe).
     async function runSimulationPython(numSpins, onProgress) {
@@ -314,9 +391,11 @@ document.addEventListener('DOMContentLoaded', () => {
         progressContainer.style.display = 'none';
         exportCsvBtn.style.display = 'block';
         exportJsonBtn.style.display = 'block';
+        if (shareUrlBtn) shareUrlBtn.style.display = 'block';
 
         updateMetrics(lastResults);
         renderCharts(lastResults);
+        saveToHistory(lastResults, { spins: numSpins, coinProb, bonusBuyMode, weights });
     });
 
     // --- CSV EXPORT LOGIC ---
@@ -613,6 +692,12 @@ function updateMetrics(results) {
     const rtpEl = document.getElementById('mTotalRtp');
     if (results.total_rtp * 100 >= 94 && results.total_rtp * 100 <= 96) rtpEl.style.color = 'var(--success-color)';
     else rtpEl.style.color = '#f50057';
+
+    const ciEl = document.getElementById('mRtpCi');
+    if (ciEl) {
+        const ci = results.rtp_ci_95 || 0;
+        ciEl.textContent = ci > 0 ? `±${(ci * 100).toFixed(2)}% (95% CI)` : '';
+    }
 
     document.getElementById('mVol').innerText = results.volatility.toFixed(2);
     document.getElementById('mHitRate').innerText = (results.hit_rate * 100).toFixed(2) + '%';

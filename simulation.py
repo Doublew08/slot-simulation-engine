@@ -305,8 +305,9 @@ class SimulationRunner:
         ht = b["hs_triggers"]
         gj = b["grand_jackpots"]
 
-        variance  = b["welf_M2"] / b["welf_n"] if b["welf_n"] > 1 else 0.0
+        variance   = b["welf_M2"] / b["welf_n"] if b["welf_n"] > 1 else 0.0
         volatility = math.sqrt(variance) / bet if variance > 0 else 0.0
+        ci_95      = 1.96 * volatility / math.sqrt(num_spins) if volatility > 0 else 0.0
 
         metrics = {
             "Total Spins":                       num_spins,
@@ -322,6 +323,7 @@ class SimulationRunner:
             "Avg Bonus Win":                     safe_div(b["bonus_win"],  bt),
             "Avg Hold and Spin Win":             safe_div(b["hs_win"],     ht),
             "Volatility":                        volatility,
+            "RTP CI 95%":                        ci_95,
         }
         for k, v in b["buckets"].items():
             metrics[f"Bucket: {k} (%)"] = (v / num_spins) * 100
