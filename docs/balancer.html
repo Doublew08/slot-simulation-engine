@@ -38,13 +38,12 @@
             <section class="glass-panel controls-panel">
                 <h2>Optimizer Mode</h2>
 
-                <div class="backend-toggle" style="margin-bottom: 1.5rem;">
-                    <button id="modeJsBtn" class="btn-secondary active" style="margin-right:0.5rem;">JS CMA-ES</button>
-                    <button id="modePyBtn" class="btn-secondary">Python CMA-ES</button>
-                    <br>
-                    <small id="modeStatus" style="color:#94a3b8; margin-top:0.4rem; display:block;">
-                        Browser CMA-ES — no server required, runs in JS
-                    </small>
+                <div class="form-group" style="margin-bottom: 1.5rem;">
+                    <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+                        <button id="modeJsBtn" class="backend-btn active">&#127760; JS CMA-ES</button>
+                        <button id="modePyBtn" class="backend-btn">&#128013; Python CMA-ES</button>
+                    </div>
+                    <small id="modeStatus">Browser CMA-ES — no server required, runs in Web Worker</small>
                 </div>
 
                 <!-- Python-only notice (hidden in JS mode) -->
