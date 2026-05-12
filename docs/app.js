@@ -4,7 +4,9 @@ let balanceChartInstance = null;
 let sessionHistChartInstance = null;
 let currentSim = null; 
 let lastResults = null; 
-let autoSpinInterval = null; 
+let autoSpinInterval = null;
+let usePythonBackend = false;
+const PYTHON_API = 'http://localhost:8000';
 
 // --- AUDIO ENGINE ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -77,6 +79,55 @@ document.addEventListener('DOMContentLoaded', () => {
             audioToggleBtn.style.borderColor = "var(--secondary-color)";
         }
     });
+
+    // --- BACKEND TOGGLE ---
+    const backendBrowserBtn = document.getElementById('backendBrowserBtn');
+    const backendPythonBtn  = document.getElementById('backendPythonBtn');
+    const backendStatus     = document.getElementById('backendStatus');
+    const pythonOptions     = document.getElementById('pythonOptions');
+
+    async function checkPythonBackend() {
+        backendStatus.style.display = 'block';
+        backendStatus.textContent   = 'checking...';
+        backendStatus.style.color   = '#94a3b8';
+        try {
+            const res = await fetch(`${PYTHON_API}/api/health`, {
+                signal: AbortSignal.timeout(3000),
+            });
+            if (res.ok) {
+                backendStatus.textContent = 'online — python server.py running';
+                backendStatus.style.color = 'var(--success-color)';
+                return true;
+            }
+        } catch (_) {}
+        backendStatus.textContent = 'offline — run: python server.py';
+        backendStatus.style.color = '#f50057';
+        return false;
+    }
+
+    if (backendBrowserBtn && backendPythonBtn) {
+        backendBrowserBtn.addEventListener('click', () => {
+            usePythonBackend = false;
+            backendBrowserBtn.classList.add('active');
+            backendPythonBtn.classList.remove('active');
+            pythonOptions.style.display  = 'none';
+            backendStatus.style.display  = 'none';
+        });
+
+        backendPythonBtn.addEventListener('click', async () => {
+            backendPythonBtn.classList.add('active');
+            backendBrowserBtn.classList.remove('active');
+            pythonOptions.style.display = 'block';
+            const online = await checkPythonBackend();
+            usePythonBackend = online;
+            if (!online) {
+                // revert toggle if server unreachable
+                backendPythonBtn.classList.remove('active');
+                backendBrowserBtn.classList.add('active');
+                pythonOptions.style.display = 'none';
+            }
+        });
+    }
 
     // --- REEL EDITOR & PRESETS LOGIC ---
     const editorGrid = document.getElementById('editorGrid');
@@ -173,9 +224,49 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportCsvBtn = document.getElementById('exportCsvBtn');
     const exportJsonBtn = document.getElementById('exportJsonBtn');
 
-    // Run simulation — uses Web Worker when available (non-blocking, faster)
-    // Falls back to main-thread chunked Promise if Workers are unsupported.
+    // Fetch simulation from Python backend via SSE stream.
+    async function runSimulationPython(numSpins, onProgress) {
+        const body = {
+            num_spins:   numSpins,
+            workers:     parseInt(document.getElementById('pyWorkers')?.value)  || 1,
+            wild_weight: parseFloat(document.getElementById('pyWildWeight')?.value) || 4.238,
+        };
+        const seedVal = document.getElementById('pySeed')?.value;
+        if (seedVal && seedVal.trim() !== '') body.seed = parseInt(seedVal);
+
+        const response = await fetch(`${PYTHON_API}/api/simulate`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(body),
+        });
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+        const reader  = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const msg = JSON.parse(line.slice(6));
+                if (msg.type === 'progress')  onProgress(msg.value * 100);
+                else if (msg.type === 'done') return msg.result;
+                else if (msg.type === 'error') throw new Error(msg.message);
+            }
+        }
+        throw new Error('Stream ended without result');
+    }
+
+    // Run simulation — dispatches to Python API or JS engine based on toggle.
     function runSimulation(numSpins, coinProb, weights, bonusBuyMode, onProgress) {
+        if (usePythonBackend) {
+            return runSimulationPython(numSpins, onProgress);
+        }
         if (typeof Worker !== 'undefined') {
             return new Promise((resolve, reject) => {
                 const worker = new Worker('simulation.worker.js');
@@ -606,30 +697,43 @@ function renderCharts(results) {
     });
 
     if (balanceChartInstance) balanceChartInstance.destroy();
-    let labels = Array.from({length: results.balance_history.length}, (_, i) => i * (results.num_spins / results.balance_history.length));
-    balanceChartInstance = new Chart(document.getElementById('balanceChart').getContext('2d'), {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Player Balance (Starting at 0)',
-                data: results.balance_history,
-                borderColor: '#10b981',
-                borderWidth: 1.5,
-                tension: 0.2,
-                pointRadius: 0
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { intersect: false, mode: 'index' },
-            plugins: {
-                title: { display: true, text: 'Player Bankroll Simulation (Random Walk)', font: { size: 16 } }
+    balanceChartInstance = null;
+    const balanceCanvas = document.getElementById('balanceChart');
+    if (results.balance_history && results.balance_history.length > 0) {
+        let labels = Array.from({length: results.balance_history.length}, (_, i) => i * (results.num_spins / results.balance_history.length));
+        balanceChartInstance = new Chart(balanceCanvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Player Balance (Starting at 0)',
+                    data: results.balance_history,
+                    borderColor: '#10b981',
+                    borderWidth: 1.5,
+                    tension: 0.2,
+                    pointRadius: 0
+                }]
             },
-            scales: {
-                x: { display: false },
-                y: { grid: { color: 'rgba(255,255,255,0.05)' } }
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                interaction: { intersect: false, mode: 'index' },
+                plugins: {
+                    title: { display: true, text: 'Player Bankroll Simulation (Random Walk)', font: { size: 16 } }
+                },
+                scales: {
+                    x: { display: false },
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' } }
+                }
             }
-        }
-    });
+        });
+    } else {
+        const ctx = balanceCanvas.getContext('2d');
+        ctx.clearRect(0, 0, balanceCanvas.width, balanceCanvas.height);
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(0, 0, balanceCanvas.width, balanceCanvas.height);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '14px Space Grotesk, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Balance history not available in Python backend mode', balanceCanvas.width / 2, balanceCanvas.height / 2);
+    }
 }
