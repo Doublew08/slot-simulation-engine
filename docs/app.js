@@ -234,8 +234,10 @@ document.addEventListener('DOMContentLoaded', () => {
             bonusBuy: document.getElementById('bonusBuyMode').checked,
             weights:  getCustomWeights(),
         };
-        const encoded = btoa(JSON.stringify(config));
-        const url = `${window.location.origin}${window.location.pathname}#sim=${encoded}`;
+        // encodeURIComponent prevents btoa's +/=/  from being mangled in the URL fragment
+        const encoded = encodeURIComponent(btoa(JSON.stringify(config)));
+        const base = window.location.origin + window.location.pathname.replace(/\/$/, '');
+        const url = `${base}/#sim=${encoded}`;
         navigator.clipboard.writeText(url).then(() => {
             shareUrlBtn.textContent = '✓ COPIED!';
             setTimeout(() => { shareUrlBtn.textContent = '🔗 SHARE CONFIG URL'; }, 2000);
@@ -248,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const match = window.location.hash.match(/#sim=(.+)/);
         if (!match) return;
         try {
-            const cfg = JSON.parse(atob(match[1]));
+            const cfg = JSON.parse(atob(decodeURIComponent(match[1])));
             const ALLOWED_SYMS = new Set(["W","H1","H2","M1","M2","L1","L2","SC","CO"]);
             if (Number.isFinite(cfg.spins) && cfg.spins > 0)
                 document.getElementById('numSpins').value = Math.max(1000, Math.min(50_000_000, cfg.spins));
@@ -264,6 +266,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 if (Object.keys(safe).length > 0) renderEditor(safe);
             }
+            // Toast so the user knows the shared config was applied
+            const toast = document.createElement('div');
+            toast.textContent = '🔗 Shared config loaded — hit Run to simulate';
+            toast.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#e2e8f0;padding:0.7rem 1.4rem;border-radius:10px;border:1px solid rgba(139,92,246,0.4);font-family:Space Grotesk,sans-serif;font-size:0.9rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.4);';
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
         } catch (_) {}
     }
 
