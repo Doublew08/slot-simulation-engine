@@ -11,12 +11,13 @@ import contextlib
 from main import build_game
 
 
-def evaluate_rtp(wild_weight: float, num_spins: int = 100_000) -> float:
+def evaluate_rtp(wild_weight: float, num_spins: int = 500_000) -> float:
     """Run a silent simulation and return Total RTP."""
     runner = build_game(wild_weight)
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
-        metrics = runner.run(num_spins=num_spins, output_csv="tuner_results.csv", seed=42)
+        # output_csv=None skips disk write — no CSV churn during search iterations
+        metrics = runner.run(num_spins=num_spins, output_csv=None, seed=42)
     return metrics["Total RTP"]
 
 
@@ -27,11 +28,11 @@ def main():
     best_w = (low_w + high_w) / 2.0
 
     print(f"Target RTP: {target_rtp:.4%}")
-    print("Phase 1 — binary search (8 iterations × 100 K spins each)")
+    print("Phase 1 — binary search (8 iterations × 500 K spins each)")
 
     for i in range(8):
         mid_w = (low_w + high_w) / 2.0
-        rtp = evaluate_rtp(mid_w, num_spins=100_000)
+        rtp = evaluate_rtp(mid_w, num_spins=500_000)
         direction = "↑" if rtp < target_rtp else "↓"
         print(f"  [{i+1}/8] W={mid_w:.4f}  RTP={rtp:.4%}  {direction}")
         if rtp < target_rtp:

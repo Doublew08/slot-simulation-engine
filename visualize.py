@@ -1,6 +1,5 @@
 import csv
 import matplotlib.pyplot as plt
-import numpy as np
 
 def visualize_results(csv_filename="results.csv", output_image="rtp_chart.png"):
     # Read the data
