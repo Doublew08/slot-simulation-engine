@@ -49,6 +49,7 @@ class SimulationRunner:
         output_csv: str = "results.csv",
         seed: Optional[int] = None,
         workers: int = 1,
+        progress_cb=None,
     ) -> dict:
         """
         Run the simulation.
@@ -67,7 +68,7 @@ class SimulationRunner:
         else:
             if seed is not None:
                 random.seed(seed)
-            batch = self._run_batch(num_spins, verbose=True)
+            batch = self._run_batch(num_spins, verbose=True, progress_cb=progress_cb)
 
         metrics = self._compute_metrics(batch)
         if output_csv:
@@ -77,7 +78,7 @@ class SimulationRunner:
 
     # ── Core simulation loop ──────────────────────────────────────────────────
 
-    def _run_batch(self, num_spins: int, verbose: bool = True) -> dict:
+    def _run_batch(self, num_spins: int, verbose: bool = True, progress_cb=None) -> dict:
         """
         Inner spin loop. Returns raw accumulator dict suitable for merging.
         Does NOT set random seed — caller is responsible.
@@ -190,6 +191,8 @@ class SimulationRunner:
 
             if verbose and chunk_end % 1_000_000 == 0:
                 print(f"  {chunk_end:,} spins complete...")
+            if progress_cb:
+                progress_cb(chunk_end / num_spins)
 
         return {
             "num_spins":       num_spins,

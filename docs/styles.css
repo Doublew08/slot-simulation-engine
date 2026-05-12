@@ -202,6 +202,27 @@ small { display: block; margin-top: 0.5rem; color: #64748b; font-size: 0.8rem; }
     transform: none;
     box-shadow: none;
 }
+.backend-btn {
+    flex: 1;
+    padding: 0.5rem 0.75rem;
+    background: transparent;
+    border: 1px solid #334155;
+    color: var(--text-secondary);
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+}
+.backend-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
+.backend-btn:hover:not(.active) {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
 
 /* Loader */
 .loader {
