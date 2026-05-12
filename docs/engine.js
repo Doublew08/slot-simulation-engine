@@ -231,8 +231,8 @@ class Simulation {
         for(let i=0; i<5; i++) this.value_pool.push("Mini");
         this.value_pool.push("Minor");
         
-        // Progressive Jackpot
-        this.globalJackpotPool = 10000.0;
+        // Progressive Jackpot — starts at 0, funded entirely by 0.5% bet contributions
+        this.globalJackpotPool = 0.0;
         this.jackpotHitTotal = 0.0;
     }
     
@@ -247,14 +247,17 @@ class Simulation {
     run_free_spins() {
         let total_payout = 0.0;
         let spins_remaining = this.bonus_spins;
-        
-        while (spins_remaining > 0) {
+        let spins_played = 0;
+        const max_total_spins = this.bonus_spins * 10;
+
+        while (spins_remaining > 0 && spins_played < max_total_spins) {
             spins_remaining--;
-            let cascade_res = this.run_cascade_spin();
-            
+            spins_played++;
+            // H&S does not fire inside free spins — pass allow_hs=false
+            let cascade_res = this.run_cascade_spin(false);
+
             total_payout += (cascade_res.payout * this.bonus_multiplier) + cascade_res.scatter_payout;
-            if (cascade_res.hs_triggered) total_payout += cascade_res.hs_payout;
-            
+
             if (cascade_res.scatters >= this.bonus_trigger_count) {
                 spins_remaining += this.bonus_spins;
             }
@@ -270,11 +273,11 @@ class Simulation {
         let roll = Math.random();
         let strength = "Weak";
         let prob_mult = 0.5;
-        let upgrade_prob = 0.01;
-        
-        if (roll < 0.10) { strength = "Ultra"; prob_mult = 2.0; upgrade_prob = 0.08; }
-        else if (roll < 0.30) { strength = "Strong"; prob_mult = 1.5; upgrade_prob = 0.04; }
-        else if (roll < 0.60) { strength = "Normal"; prob_mult = 1.0; upgrade_prob = 0.02; }
+        let upgrade_prob = 0.0;   // Weak: no upgrades
+
+        if (roll < 0.10) { strength = "Ultra"; prob_mult = 2.0; upgrade_prob = 0.02; }
+        else if (roll < 0.30) { strength = "Strong"; prob_mult = 1.5; upgrade_prob = 0.01; }
+        else if (roll < 0.60) { strength = "Normal"; prob_mult = 1.0; upgrade_prob = 0.005; }
         
         let current_prob = this.hs_coin_prob * prob_mult;
         
@@ -372,7 +375,7 @@ class Simulation {
         }
         if (hit_grand) {
             total_value += this.globalJackpotPool;
-            this.globalJackpotPool = 10000.0; // Reset network pool
+            this.globalJackpotPool = 0.0; // Reset — funded by future 0.5% contributions only
         }
         
         return {
@@ -384,10 +387,10 @@ class Simulation {
         };
     }
     
-    run_cascade_spin() {
+    run_cascade_spin(allow_hs = true) {
         let grid = this.engine.spin();
         let total_spin_payout = 0.0;
-        
+
         let initial_scatters = this.evaluator.evaluate_scatters(grid);
         let scatter_payout = initial_scatters.payout;
         let scatter_count = initial_scatters.count;
@@ -400,18 +403,17 @@ class Simulation {
             if (eval_res.payout > 0) {
                 total_spin_payout += eval_res.payout;
                 let coords = eval_res.coords;
-                
+
                 let cols_to_remove = {};
                 for (let i=0; i<5; i++) cols_to_remove[i] = [];
                 for (let coord of coords) {
                     cols_to_remove[coord[1]].push(coord[0]);
                 }
-                
+
                 for (let c=0; c<5; c++) {
                     if (cols_to_remove[c].length > 0) {
-                        cols_to_remove[c].sort((a,b) => b-a); // Bottom up
+                        cols_to_remove[c].sort((a,b) => b-a);
                         for (let r of cols_to_remove[c]) {
-                            // Shift down
                             for(let i=r; i>0; i--) {
                                 grid[i][c] = grid[i-1][c];
                             }
@@ -424,9 +426,12 @@ class Simulation {
                 keep_cascading = false;
             }
         }
-        
-        let hs_res = this.run_hs(grid);
-        
+
+        // H&S only fires on base game spins, not inside free spins
+        let hs_res = allow_hs
+            ? this.run_hs(grid)
+            : {triggered: false, payout: 0, grand: false, strength: null, upgrades: 0};
+
         return {
             payout: total_spin_payout,
             scatters: scatter_count,
