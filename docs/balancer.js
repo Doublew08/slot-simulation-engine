@@ -110,8 +110,10 @@ function updateMetrics(rtp, error, wildWeight) {
 
 function wireSendToMain(wildWeight) {
     const weights = { ...DEFAULT_WEIGHTS, W: wildWeight };
-    // Only send weights + autorun — do NOT override main engine's spin count or coin prob
-    const config  = { weights, autorun: true };
+    // coinProb MUST match what the balancer optimized at (0.05) — otherwise
+    // H&S RTP differs and main engine shows a different total RTP.
+    // spins deliberately omitted — main engine keeps whatever user set.
+    const config  = { weights, coinProb: 0.05, autorun: true };
     const encoded = encodeURIComponent(btoa(JSON.stringify(config)));
     const btn     = document.getElementById('sendToMainBtn');
     btn.href      = `index.html#sim=${encoded}`;
@@ -140,8 +142,11 @@ function runRobbinsMonro(targetRtp, maxIter, spinsPerEval) {
             } else if (msg.type === 'done') {
                 activeWorker = null;
                 worker.terminate();
-                updateMetrics(msg.target, msg.delta, msg.wild_weight);
-                setProgress(100, `Converged in ${msg.iters} iterations`);
+                // Use verified_rtp (actual RTP at xFinal), not msg.target (the goal label)
+                updateMetrics(msg.verified_rtp, msg.delta, msg.wild_weight);
+                setProgress(100,
+                    `Done — ${msg.iters} iters | verified RTP: ${(msg.verified_rtp * 100).toFixed(2)}% ` +
+                    `±${(msg.verified_ci * 100).toFixed(2)}% | Δ ${(msg.delta * 100).toFixed(3)}%`);
                 resolve(msg.wild_weight);
             } else if (msg.type === 'error') {
                 activeWorker = null;
