@@ -76,6 +76,50 @@ class SimulationRunner:
         self._print_results(metrics)
         return metrics
 
+    # ── Cascade (tumble) mechanic ─────────────────────────────────────────────
+
+    def _run_cascade_spin(self, grid: list) -> tuple:
+        """
+        Apply cascade to an already-spun grid.
+        Winning symbols are removed, remaining symbols fall down, gaps fill
+        from the top using the reel's weighted distribution. Repeats until
+        no win or 15 cascades reached (matches JS engine cap).
+        Returns (total_line_payout, scatter_count, scatter_payout).
+        """
+        reels    = self.reel_engine.reels
+        evaluate = self.evaluator.evaluate
+        eval_scatters = self.evaluator.evaluate_scatters
+
+        sc_count, sc_pay = eval_scatters(grid)
+        total_payout = 0.0
+
+        for _ in range(15):
+            bp, winning_lines = evaluate(grid)
+            if bp <= 0:
+                break
+            total_payout += bp
+
+            # Collect unique winning (row, col) coords from all winning lines
+            winning_coords: set = set()
+            for win in winning_lines:
+                for coord in win["coords"]:
+                    winning_coords.add(coord)
+
+            # Group by column, sort rows descending (remove bottom-first)
+            cols_to_remove: dict = {}
+            for row, col in winning_coords:
+                cols_to_remove.setdefault(col, []).append(row)
+
+            for col, rows in cols_to_remove.items():
+                for row in sorted(rows, reverse=True):
+                    # Shift everything above this row down by one
+                    for i in range(row, 0, -1):
+                        grid[i][col] = grid[i - 1][col]
+                    # Fill the vacated top cell with a fresh symbol
+                    grid[0][col] = reels[col].spin_one()
+
+        return total_payout, sc_count, sc_pay
+
     # ── Core simulation loop ──────────────────────────────────────────────────
 
     def _run_batch(self, num_spins: int, verbose: bool = True, progress_cb=None) -> dict:
@@ -103,7 +147,7 @@ class SimulationRunner:
         bet           = self.bet_amount
 
         bonus_check   = bonus.check_trigger              if bonus else None
-        bonus_run     = (lambda re, ev: bonus.run_free_spins(re, ev)) if bonus else None
+        bonus_run     = (lambda re, ev: bonus.run_free_spins(re, ev, cascade_fn=self._run_cascade_spin)) if bonus else None
         hs_check      = hs.check_trigger                 if hs    else None
         hs_run        = hs.run_hold_and_spin             if hs    else None
         reel_engine   = self.reel_engine
@@ -149,9 +193,8 @@ class SimulationRunner:
 
                 spin_win = 0.0
 
-                # Base game
-                bp, _          = evaluate(grid)
-                sc_count, sc_pay = eval_scatters(grid)
+                # Base game — cascade tumble (winning symbols removed, new ones fall in)
+                bp, sc_count, sc_pay = self._run_cascade_spin(grid)
                 bsw = (bp + sc_pay) * bet
                 if bsw > 0:
                     base_hits += 1

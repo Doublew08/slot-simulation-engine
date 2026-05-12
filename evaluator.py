@@ -84,12 +84,14 @@ class LinesEvaluator(BaseEvaluator):
                 best_sym = self.paytable.wild_name if best_payout == pure_wild_payout and pure_wild_payout > 0 else first_sym
                 
                 if best_payout > 0:
+                    actual_count = match_count if best_payout == payout else pure_wild_count
                     total_payout += best_payout
                     winning_lines.append({
                         "line": line_idx,
                         "symbol": best_sym,
-                        "count": match_count if best_payout == payout else pure_wild_count,
-                        "payout": best_payout
+                        "count": actual_count,
+                        "payout": best_payout,
+                        "coords": [(line[col], col) for col in range(actual_count)],
                     })
                     
         return total_payout, winning_lines
