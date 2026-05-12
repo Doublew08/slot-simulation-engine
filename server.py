@@ -217,26 +217,41 @@ async def tune(req: TuneRequest, request: Request):
     def run_thread():
         try:
             from tuner import evaluate_rtp
+            import math as _math
 
-            low_w, high_w = 0.5, 15.0
-            best_w = (low_w + high_w) / 2.0
+            # Robbins-Monro: x_{k+1} = x_k − (C/k^α)(rtp − target)
+            C = 3.0; ALPHA = 0.6
+            x = 4.0; x_history = []; best_w = x; best_fitness = float("inf")
 
             for i in range(req.iterations):
-                mid_w = (low_w + high_w) / 2.0
-                rtp = evaluate_rtp(mid_w, num_spins=req.spins_per_iter)
+                k   = i + 1
+                rtp = evaluate_rtp(x, num_spins=req.spins_per_iter)
+                err = rtp - req.target_rtp
+                fitness = abs(err)
+                x_history.append(x)
+                if fitness < best_fitness:
+                    best_fitness = fitness; best_w = x
+                win   = x_history[-5:]
+                x_avg = sum(win) / len(win)
+
                 loop.call_soon_threadsafe(aq.put_nowait, {
-                    "type":      "progress",
-                    "iteration": i + 1,
-                    "total":     req.iterations,
-                    "weight":    round(mid_w, 4),
-                    "rtp":       round(rtp, 6),
-                    "direction": "up" if rtp < req.target_rtp else "down",
+                    "type":        "progress",
+                    "iteration":   k,
+                    "total":       req.iterations,
+                    "weight":      round(x, 4),
+                    "weight_avg":  round(x_avg, 4),
+                    "rtp":         round(rtp, 6),
+                    "direction":   "up" if err < 0 else "down",
                 })
-                if rtp < req.target_rtp:
-                    low_w = mid_w
-                else:
-                    high_w = mid_w
-                best_w = mid_w
+
+                if fitness < 0.001:
+                    break
+
+                step = C / _math.pow(k, ALPHA)
+                x = max(0.3, min(20.0, x - step * err))
+
+            win   = x_history[-5:]
+            best_w = sum(win) / len(win)
 
             loop.call_soon_threadsafe(aq.put_nowait, {"type": "verifying", "weight": round(best_w, 4)})
             final_rtp = evaluate_rtp(best_w, num_spins=3_000_000)
