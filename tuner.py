@@ -7,6 +7,7 @@ Usage:
     python tuner.py [target_rtp]        # default target: 0.95
 """
 import io
+import math
 import sys
 import contextlib
 
@@ -62,7 +63,8 @@ def main():
             break
 
         step = C / (k ** ALPHA)
-        x = max(0.3, min(20.0, x - step * error))
+        clipped_error = math.copysign(min(abs(error), 0.5), error)  # gradient clipping
+        x = max(0.3, min(20.0, x - step * clipped_error))
 
     # Final estimate: Polyak-Ruppert average of last 5 iterates
     win     = x_history[-5:]
