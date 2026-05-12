@@ -60,6 +60,52 @@ slot-simulation-engine/
     └── app.js           UI bindings and chart rendering
 ```
 
+### Architecture Graph
+
+```mermaid
+graph TD
+    %% Styling
+    classDef ui fill:#4a148c,stroke:#ab47bc,stroke-width:2px,color:#fff;
+    classDef engine fill:#004d40,stroke:#26a69a,stroke-width:2px,color:#fff;
+    classDef data fill:#b71c1c,stroke:#ef5350,stroke-width:2px,color:#fff;
+    classDef legacy fill:#424242,stroke:#bdbdbd,stroke-width:2px,color:#fff,stroke-dasharray: 5 5;
+
+    %% Client UI Layer
+    subgraph Frontend ["Frontend UI (docs/index.html)"]
+        UI_Dashboard["Dashboard UI"]:::ui
+        UI_Controls["Interactive Controls"]:::ui
+        UI_Grid["Visual Grid Renderer"]:::ui
+    end
+
+    %% Application Logic
+    subgraph AppJS ["Application Controller (docs/app.js)"]
+        APP_Loop["Session Simulator Loop"]:::ui
+        APP_Balancer["Auto-Balancer (Genetic Algorithm)"]:::ui
+    end
+
+    %% Math Engine Layer
+    subgraph EngineJS ["Mathematical Engine (docs/engine.js)"]
+        SIM["Simulation (Core Controller)"]:::engine
+        ENG["Engine (Spin Generator)"]:::engine
+        EVAL["Evaluator (Win & Cascade Detection)"]:::engine
+        PAY["Paytable (Symbol Defs)"]:::data
+        REEL["Reels (Strip Configurations)"]:::data
+    end
+
+    %% Connections
+    UI_Controls -->|Triggers| APP_Loop
+    UI_Controls -->|Triggers| APP_Balancer
+    APP_Loop -->|Calls run_cascade_spin()| SIM
+    APP_Balancer -->|Mutates Weights| SIM
+    SIM -->|Returns Results| APP_Loop
+    SIM -->|Instantiates| ENG
+    SIM -->|Instantiates| EVAL
+    SIM -->|Instantiates| PAY
+    ENG -->|Reads from| REEL
+    APP_Loop -->|Updates| UI_Dashboard
+    class SIM,ENG,EVAL,PAY,REEL engine;
+```
+
 ---
 
 ## Quick Start
