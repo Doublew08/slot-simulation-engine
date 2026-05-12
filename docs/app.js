@@ -10,6 +10,11 @@ const PYTHON_API = (window.location.hostname === 'localhost' || window.location.
     ? 'http://localhost:8000'
     : 'https://slot-simulation-engine.onrender.com';
 
+// Silent warmup — pings Render on page load so server is warm before user clicks Python API
+if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    fetch(`${PYTHON_API}/api/health`, { signal: AbortSignal.timeout(60000) }).catch(() => {});
+}
+
 // --- AUDIO ENGINE ---
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 let soundEnabled = true;
@@ -299,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!section || !list) return;
         if (hist.length === 0) { section.style.display = 'none'; return; }
         section.style.display = '';
-        list.innerHTML = hist.map(e => `
+        list.innerHTML = hist.map((e, i) => `
             <div class="metric-card" style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;margin-bottom:0.5rem;">
                 <div>
                     <span style="color:var(--text-secondary);font-size:0.8rem;">${new Date(e.ts).toLocaleString()}</span>
@@ -309,8 +314,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span style="color:var(--text-secondary);margin-left:0.75rem;">${(e.spins/1e6).toFixed(2)}M spins</span>
                     </div>
                 </div>
+                <button class="btn-secondary hist-rerun-btn" data-idx="${i}" style="padding:0.3rem 0.75rem;font-size:0.8rem;white-space:nowrap;margin-left:1rem;">↺ Re-run</button>
             </div>
         `).join('');
+
+        list.querySelectorAll('.hist-rerun-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const entry = hist[parseInt(btn.dataset.idx)];
+                if (!entry?.config) return;
+                const cfg = entry.config;
+                if (Number.isFinite(cfg.spins))   document.getElementById('numSpins').value  = cfg.spins;
+                if (Number.isFinite(cfg.coinProb)) document.getElementById('coinProb').value  = cfg.coinProb;
+                if (typeof cfg.bonusBuyMode === 'boolean') document.getElementById('bonusBuyMode').checked = cfg.bonusBuyMode;
+                if (cfg.weights) renderEditor(cfg.weights);
+                runBtn.click();
+            });
+        });
     }
 
     const clearHistBtn = document.getElementById('clearHistoryBtn');
