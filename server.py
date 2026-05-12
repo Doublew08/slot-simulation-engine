@@ -64,24 +64,16 @@ def health():
 @app.post("/api/simulate")
 async def simulate(req: SimulateRequest):
     loop = asyncio.get_event_loop()
-    aq: asyncio.Queue = asyncio.Queue()
+    future: asyncio.Future = loop.create_future()
 
     def run_thread():
         try:
             runner = build_game(req.wild_weight)
-            loop.call_soon_threadsafe(aq.put_nowait, {"type": "progress", "value": 0.001})
-
-            def on_progress(pct: float):
-                loop.call_soon_threadsafe(
-                    aq.put_nowait, {"type": "progress", "value": round(pct, 4)}
-                )
-
             metrics = runner.run(
                 num_spins=req.num_spins,
                 output_csv=None,
                 seed=req.seed,
-                workers=req.workers,
-                progress_cb=on_progress if req.workers == 1 else None,
+                workers=1,  # multiprocessing unreliable on Render containers
             )
 
             buckets = {}
@@ -111,25 +103,14 @@ async def simulate(req: SimulateRequest):
                 "avg_jackpot":     None,
                 "backend":         "python",
             }
-            loop.call_soon_threadsafe(aq.put_nowait, {"type": "done", "result": result})
+            loop.call_soon_threadsafe(future.set_result, result)
 
         except Exception as exc:
-            loop.call_soon_threadsafe(aq.put_nowait, {"type": "error", "message": str(exc)})
+            loop.call_soon_threadsafe(future.set_exception, exc)
 
     threading.Thread(target=run_thread, daemon=True).start()
-
-    async def stream():
-        while True:
-            try:
-                msg = await asyncio.wait_for(aq.get(), timeout=20)
-            except asyncio.TimeoutError:
-                yield ": keep-alive\n\n"
-                continue
-            yield _sse(msg)
-            if msg["type"] in ("done", "error"):
-                break
-
-    return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)
+    result = await future
+    return result
 
 
 @app.post("/api/tune")
