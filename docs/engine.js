@@ -469,9 +469,9 @@ class Simulation {
         let hs_triggers = 0;
         let grand_hits = 0;
         
-        let sum_win = 0.0;
-        let sum_win_sq = 0.0;
-        
+        // Welford online variance — numerically stable vs naive E[X²]-E[X]²
+        let welf_n = 0, welf_mean = 0.0, welf_M2 = 0.0;
+
         let strength_counts = {"Weak": 0, "Normal": 0, "Strong": 0, "Ultra": 0};
         let total_upgrades = 0;
         
@@ -543,8 +543,10 @@ class Simulation {
                         }
                     }
                     
-                    sum_win += spin_total_win;
-                    sum_win_sq += spin_total_win * spin_total_win;
+                    welf_n++;
+                    const _d1 = spin_total_win - welf_mean;
+                    welf_mean += _d1 / welf_n;
+                    welf_M2   += _d1 * (spin_total_win - welf_mean);
                     current_balance += spin_total_win;
                     
                     // Buckets
@@ -574,16 +576,16 @@ class Simulation {
                     let bonus_rtp = bonus_win_total / total_spent;
                     let hs_rtp = hs_win_total / total_spent;
                     
-                    let hit_rate = base_hits / numSpins;
-                    let mean_win = sum_win / numSpins;
-                    let variance = (sum_win_sq / numSpins) - (mean_win * mean_win);
-                    let volatility = Math.sqrt(Math.max(0, variance));
-                    
+                    const hit_rate  = base_hits / numSpins;
+                    const variance  = welf_n > 1 ? welf_M2 / welf_n : 0.0;
+                    const volatility = Math.sqrt(Math.max(0, variance));
+                    const rtp_ci_95  = volatility > 0 ? 1.96 * volatility / Math.sqrt(numSpins) : 0.0;
+
                     // Convert buckets to percentages
                     for (let key in buckets) {
                         buckets[key] = (buckets[key] / numSpins) * 100;
                     }
-                    
+
                     resolve({
                         total_rtp: total_rtp,
                         base_rtp: base_rtp,
@@ -595,6 +597,7 @@ class Simulation {
                         grand_freq: grand_hits > 0 ? numSpins / grand_hits : 0,
                         avg_jackpot: grand_hits > 0 ? this.jackpotHitTotal / grand_hits : 10000.0,
                         volatility: volatility,
+                        rtp_ci_95: rtp_ci_95,
                         num_spins: numSpins,
                         buckets: buckets,
                         balance_history: balance_history,
@@ -612,7 +615,8 @@ class Simulation {
     runSimulationSync(numSpins, progressCallback, bonusBuyMode = false) {
         let total_spent = 0.0, base_win_total = 0.0, bonus_win_total = 0.0, hs_win_total = 0.0;
         let base_hits = 0, bonus_triggers = 0, hs_triggers = 0, grand_hits = 0;
-        let sum_win = 0.0, sum_win_sq = 0.0;
+        // Welford online variance — numerically stable vs naive E[X²]-E[X]²
+        let welf_n = 0, welf_mean = 0.0, welf_M2 = 0.0;
         let strength_counts = {"Weak": 0, "Normal": 0, "Strong": 0, "Ultra": 0};
         let total_upgrades = 0;
         let buckets = {"0x": 0, "0-1x": 0, "1-5x": 0, "5-15x": 0, "15-50x": 0, "50x+": 0};
@@ -660,7 +664,10 @@ class Simulation {
                 }
             }
 
-            sum_win += spin_total_win; sum_win_sq += spin_total_win * spin_total_win;
+            welf_n++;
+            const _d1 = spin_total_win - welf_mean;
+            welf_mean += _d1 / welf_n;
+            welf_M2   += _d1 * (spin_total_win - welf_mean);
             current_balance += spin_total_win;
 
             let win_mult = spin_total_win / this.bet_amount;
@@ -677,9 +684,10 @@ class Simulation {
             }
         }
 
-        let total_win = base_win_total + bonus_win_total + hs_win_total;
-        let mean_win = sum_win / numSpins;
-        let variance = (sum_win_sq / numSpins) - (mean_win * mean_win);
+        const total_win = base_win_total + bonus_win_total + hs_win_total;
+        const variance   = welf_n > 1 ? welf_M2 / welf_n : 0.0;
+        const volatility  = Math.sqrt(Math.max(0, variance));
+        const rtp_ci_95   = volatility > 0 ? 1.96 * volatility / Math.sqrt(numSpins) : 0.0;
         for (let key in buckets) buckets[key] = (buckets[key] / numSpins) * 100;
 
         return {
@@ -692,7 +700,8 @@ class Simulation {
             hs_freq:       hs_triggers > 0 ? numSpins / hs_triggers : 0,
             grand_freq:    grand_hits > 0 ? numSpins / grand_hits : 0,
             avg_jackpot:   grand_hits > 0 ? this.jackpotHitTotal / grand_hits : 0,
-            volatility:    Math.sqrt(Math.max(0, variance)),
+            volatility:    volatility,
+            rtp_ci_95:     rtp_ci_95,
             num_spins:     numSpins,
             buckets,
             balance_history,

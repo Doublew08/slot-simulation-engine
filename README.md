@@ -17,7 +17,7 @@
 
 ## What This Is
 
-A full-stack slot game math toolkit — Python simulation engine on the backend, interactive browser UI on the frontend. Models the same mechanics used in commercial casino titles: 20-line payline evaluation, free-spins with retrigger, and Dragon Link–style Hold & Spin with a four-tier jackpot system.
+A full-stack slot game math toolkit — Python simulation engine on the backend, interactive browser UI on the frontend. Models the same mechanics used in commercial casino titles: 20-line payline evaluation, cascade/tumble mechanic, free-spins with retrigger, and Dragon Link–style Hold & Spin with a four-tier jackpot system.
 
 Built for math designers who need numbers fast, not stories.
 
@@ -27,20 +27,21 @@ Built for math designers who need numbers fast, not stories.
 
 | | |
 |---|---|
-| 🎲 **Monte Carlo runner** | 10M+ spins with Welford online variance (numerically stable) |
+| 🎲 **Monte Carlo runner** | 10M+ spins with Welford online variance (numerically stable, both Python and JS) |
 | ⚡ **Parallel execution** | `multiprocessing.Pool` — near-linear scaling across cores |
 | 🌱 **Reproducible runs** | Seeded RNG with deterministic per-worker seed derivation |
 | 📊 **RTP decomposition** | Base / Bonus / Hold & Spin contributions tracked independently |
-| 📉 **95% Confidence Interval** | `±1.96 × σ / √n` on RTP displayed live after every run |
+| 📉 **95% Confidence Interval** | `±1.96 × σ / √n` on RTP — live in both JS and Python engines |
 | 🔍 **Win evaluation** | Lines (20-payline) and Ways (243) evaluators, wild substitution |
+| 🌊 **Cascade mechanic** | Tumble/avalanche — winning symbols removed, symbols fall, gaps refill; up to 15 cascades |
 | 🎰 **Free Spins** | Scatter-triggered, configurable multiplier, retrigger cap |
 | 🔒 **Hold & Spin** | Reel-weight coin probability, 3 lives, Grand jackpot on full screen |
-| 🎯 **RTP Tuner** | Binary search converges wild weight to any target RTP |
+| 🎯 **RTP Tuner** | Robbins-Monro stochastic approximation finds optimal wild weight |
 | 🌐 **Web simulator** | In-browser Monte Carlo — no server needed |
-| 🐍 **Python API backend** | FastAPI on Render — swap engine via toggle, results cached |
+| 🐍 **Python API backend** | FastAPI on Render — simulate, tune, and balance via HTTP |
 | 💾 **Simulation history** | Last 10 runs stored in `localStorage`; one-click re-run |
 | 🔗 **Share URL** | Encode full config into a URL hash; anyone with the link loads it instantly |
-| 🧬 **Genetic auto-balancer** | JS BLX-α GA with fitness sharing **or** Python CMA-ES via `/api/balance` SSE |
+| ⚖️ **RTP Auto-Balancer** | In-browser Robbins-Monro optimizer tunes wild weight to any target RTP |
 | 🔐 **Security hardened** | CORS restriction, per-IP rate limiting, Pydantic input bounds, XSS-safe DOM |
 | ✅ **46 unit + integration tests** | Full coverage including end-to-end `SimulationRunner` pipeline |
 
@@ -56,20 +57,21 @@ slot-simulation-engine/
 ├── evaluator.py         Win evaluation — LinesEvaluator, WaysEvaluator
 ├── bonus.py             Free-spins feature with retrigger cap
 ├── hold_and_spin.py     Hold & Spin — jackpots, reel-accurate respins
-├── simulation.py        Monte Carlo runner — stats, CI, balance history, CSV export
-├── server.py            FastAPI backend — simulate + tune endpoints, result cache
-├── tuner.py             Binary-search wild weight to target RTP
+├── simulation.py        Monte Carlo runner — cascade, stats, CI, balance history, CSV export
+├── server.py            FastAPI backend — simulate, tune (RM), balance (CMA-ES) endpoints
+├── tuner.py             Robbins-Monro wild weight tuner with Polyak-Ruppert averaging
 ├── visualize.py         Matplotlib charts from results.csv
 ├── tests.py             46 unit + integration tests
 ├── requirements.txt     FastAPI + uvicorn
 ├── render.yaml          Render.com deployment config
 └── docs/
-    ├── index.html       Web simulator UI
-    ├── balancer.html    Genetic auto-balancer studio
-    ├── engine.js        JS port of the math engine (cascade, H&S, free spins)
+    ├── index.html            Web simulator UI
+    ├── balancer.html         RTP Auto-Balancer studio (Robbins-Monro)
+    ├── engine.js             JS math engine — cascade, H&S, free spins, Welford variance
     ├── simulation.worker.js  Web Worker wrapper
-    ├── balancer.js      JS GA (BLX-α crossover, fitness sharing) + Python CMA-ES client
-    └── app.js           UI controller — history, share URL, CI display, backend toggle
+    ├── balancer.worker.js    Robbins-Monro optimizer Web Worker
+    ├── balancer.js           Balancer UI controller — chart, metrics, send-to-main
+    └── app.js                UI controller — history, share URL, CI display
 ```
 
 ### Architecture Graph
@@ -88,7 +90,7 @@ graph TD
 
     subgraph AppJS ["Application Controller (docs/app.js)"]
         APP_Loop["Session Simulator Loop"]:::ui
-        APP_Balancer["Auto-Balancer (Genetic Algorithm)"]:::ui
+        APP_Balancer["RTP Auto-Balancer (Robbins-Monro)"]:::ui
     end
 
     subgraph EngineJS ["Mathematical Engine (docs/engine.js)"]
@@ -102,7 +104,7 @@ graph TD
     UI_Controls -->|Triggers| APP_Loop
     UI_Controls -->|Triggers| APP_Balancer
     APP_Loop -->|Calls run_cascade_spin| SIM
-    APP_Balancer -->|Mutates Weights| SIM
+    APP_Balancer -->|Tunes wild_weight via RM| SIM
     SIM -->|Returns Results| APP_Loop
     SIM -->|Instantiates| ENG
     SIM -->|Instantiates| EVAL
@@ -137,7 +139,7 @@ python main.py 5000000 42
 # Parallel — 4 worker processes
 python main.py 10000000 42 4
 
-# Tune wild weight to exactly 95% RTP
+# Tune wild weight to exactly 95% RTP (Robbins-Monro)
 python tuner.py 0.95
 
 # Visualize the last run
@@ -192,7 +194,7 @@ Results exported to results.csv
 
 ## Python API Backend
 
-`server.py` exposes the Python engine over HTTP via FastAPI. The web UI can switch between Browser JS and Python API at runtime.
+`server.py` exposes the Python engine over HTTP via FastAPI.
 
 ### Endpoints
 
@@ -200,7 +202,7 @@ Results exported to results.csv
 |--------|------|-------------|
 | `GET` | `/api/health` | Liveness check |
 | `POST` | `/api/simulate` | Run Monte Carlo simulation |
-| `POST` | `/api/tune` | Binary-search wild weight to target RTP (SSE stream) |
+| `POST` | `/api/tune` | Robbins-Monro wild weight tuner (SSE stream) |
 | `POST` | `/api/balance` | CMA-ES multi-weight optimizer, streams per-eval progress (SSE) |
 
 ### `POST /api/simulate`
@@ -258,7 +260,7 @@ All parameters are centralized in `build_game()` inside `main.py`.
 | SC | Scatter | 2.0× | 10.0× | 50.0× |
 | CO | Coin | — | — | — |
 
-All multipliers are relative to `bet_amount`.
+All multipliers are relative to `bet_amount`. The JS engine uses scaled-down equivalents (lower absolute values, same win distribution shape) calibrated to match the JS reel weight distribution (L1=30, L2=35 vs Python's L1=10, L2=12).
 
 ### Reel Weights
 
@@ -275,6 +277,17 @@ All multipliers are relative to `bet_amount`.
 | CO | 3 | 4 | 5 | 4 | 3 |
 
 Higher weight = more frequent. Wild weight is the tuner's control knob.
+
+### Cascade Mechanic
+
+Every spin runs a tumble loop (up to 15 cascades):
+1. Evaluate winning lines
+2. Remove winning symbol positions
+3. Shift remaining symbols down (gravity)
+4. Refill vacated top cells from live reel weights
+5. Repeat until no win or cascade cap reached
+
+Scatters are evaluated once on the initial spin (before any cascades). Cascade wins stack on top of the initial payout.
 
 ### Bonus & Hold and Spin
 
@@ -297,32 +310,42 @@ HoldAndSpinFeature(
 
 ---
 
-## Genetic Auto-Balancer
+## RTP Auto-Balancer
 
-`docs/balancer.html` offers two optimizer modes:
+`docs/balancer.html` — in-browser Robbins-Monro optimizer. Runs entirely in a Web Worker; no server needed.
 
-### Mode 1 — JS Genetic Algorithm (browser, no server)
+### Algorithm: Robbins-Monro + Polyak-Ruppert Averaging
 
-1. **Initialise** — population of N weight-sets; first individual is baseline, rest randomized ±50%
-2. **Evaluate** — each individual runs a full JS Monte Carlo simulation; fitness = `|rtp − target|`
-3. **Fitness sharing** — penalise crowded solutions (`σ = 0.3`) so the population stays diverse
-4. **Select** — top half; top 2 pass unchanged (elitism)
-5. **Crossover** — BLX-α blend crossover (`α = 0.5`), samples beyond the parent range for exploration
-6. **Mutate** — adaptive rate decays `0.4 → 0.1` over generations
-7. **Repeat** — until max generations or error < 0.05%
+Tunes a single parameter (`wild_weight`) to hit a target RTP.
 
-### Mode 2 — Python CMA-ES (requires backend, `/api/balance`)
+**Update rule** (each iteration k):
 
-- Optimizes all 9 symbol weights simultaneously in **log-space** (ensures positivity)
-- Uses `cma.CMAEvolutionStrategy` with `popsize=6`, `σ₀=0.3`, up to `max_evals` total evaluations
-- Each evaluation runs `spins_per_eval` spins via `_build_with_weights()` and streams progress via SSE
-- More sample-efficient than GA for continuous optimization; converges in ~50–100 evals
+```
+x_{k+1} = x_k − (C / k^α) × (RTP(x_k) − target)
+```
 
-### Shared Output
+**Parameters:**
+- `C = 8.0` — step scale (tuned for ~1–2% RTP sensitivity per wild_weight unit)
+- `α = 0.6` — decay exponent (balances convergence speed vs noise robustness)
+- Starting point: `x₀ = 4.0`
+- Bounds: `[0.3, 20.0]`
 
-- Live convergence chart (best RTP vs. each generation/eval) updates in real time
-- Optimized weight grid updates every generation/evaluation
-- **Send to Main Engine** button deep-links best weights into the simulator via URL hash
+**Polyak-Ruppert averaging:** final estimate = mean of last 5 iterates. Reduces noise without extra spin budget.
+
+**Convergence:** Early stop when `|RTP − target| < 0.1%`. Typical: 15–25 iterations at 100K spins each.
+
+**Why Robbins-Monro over alternatives:**
+- **Bisection** — uses only the sign of the error, wastes gradient information, linear convergence
+- **CMA-ES** — optimal for multi-dimensional search; overkill and slower for 1D
+- **Brent's method** — deterministic root-finder; assumes noise-free evaluations; diverges under stochastic noise
+- **RM** — uses the full gradient, provably convergent under noise, optimal for 1D stochastic root-finding
+
+### Workflow
+
+1. Set target RTP, max iterations, spins per iteration
+2. Click **INITIATE OPTIMIZATION** — runs in Web Worker, UI stays responsive
+3. Watch real-time convergence chart (RTP vs iteration vs target line)
+4. On convergence, click **SEND TO MAIN ENGINE** — deep-links optimized `wild_weight` to the simulator
 
 ---
 
@@ -341,7 +364,7 @@ HoldAndSpinFeature(
 <details>
 <summary>🔍 <strong>evaluator.py</strong> — LinesEvaluator, WaysEvaluator</summary>
 
-- `LinesEvaluator(paytable, paylines)` — evaluates 20 fixed paylines left-to-right; wilds substitute; scatters break lines
+- `LinesEvaluator(paytable, paylines)` — evaluates 20 fixed paylines left-to-right; wilds substitute; scatters break lines; returns winning coords for cascade removal
 - `WaysEvaluator(paytable)` — counts matching positions per reel; ways = product across consecutive reels; requires ≥ 3 reels
 - Both expose `evaluate(grid) → (payout, wins)` and `evaluate_scatters(grid) → (count, payout)`
 - Wild evaluation picks the higher of: substituted-symbol run vs pure-wild run
@@ -353,6 +376,7 @@ HoldAndSpinFeature(
 
 - Triggers when scatter count ≥ `trigger_count`
 - Retrigger adds `num_free_spins` to remaining count; hard-capped at `max_total_spins`
+- Accepts `cascade_fn` parameter — free spins run the same cascade mechanic as the base game
 - Optional `bonus_reel_engine` for dedicated bonus strips
 - Returns raw multiplier totals; `simulation.py` scales by `bet_amount`
 
@@ -373,9 +397,10 @@ HoldAndSpinFeature(
 <summary>⚙️ <strong>simulation.py</strong> — SimulationRunner</summary>
 
 - `run(num_spins, seed, workers)` — dispatches serial or parallel execution
-- `_run_batch()` — inner spin loop; returns raw accumulator dict including balance history (sampled every 1K spins)
+- `_run_cascade_spin(grid)` — tumble loop: evaluate → remove winners → gravity-shift → refill → repeat (max 15)
+- `_run_batch()` — inner spin loop; Welford online variance; returns raw accumulator dict including balance history (sampled every 1K spins)
 - `_merge_batches()` — parallel Welford merge (Chan et al. 1979) for numerically stable variance across workers; balance histories are offset-concatenated for a continuous random walk
-- `_compute_metrics()` — derives all reported metrics including `RTP CI 95% = 1.96 × volatility / √n`
+- `_compute_metrics()` — derives all reported metrics including `RTP CI 95% = 1.96 × σ / √n`
 - `exclusive_features=True` — skips Hold & Spin on spins where bonus already fired
 
 </details>
@@ -384,8 +409,8 @@ HoldAndSpinFeature(
 <summary>🌐 <strong>server.py</strong> — FastAPI backend</summary>
 
 - `POST /api/simulate` — runs the Python engine in a daemon thread; result returned as plain JSON (SSE-free, proxy-safe)
-- `POST /api/tune` — binary-search tuner streamed as Server-Sent Events
-- `POST /api/balance` — CMA-ES multi-weight optimizer; streams one SSE event per evaluation; uses `_build_with_weights()` to construct a full `SimulationRunner` from arbitrary 9-symbol weight dicts; requires `pip install cma`
+- `POST /api/tune` — Robbins-Monro tuner streamed as Server-Sent Events; Polyak-Ruppert averaging; random seed per eval for unbiased gradient estimates
+- `POST /api/balance` — CMA-ES multi-weight optimizer in log-space; streams one SSE event per evaluation; uses `_build_with_weights()` to construct a full `SimulationRunner` from arbitrary 9-symbol weight dicts; requires `pip install cma`
 - In-memory result cache: FIFO, 100-entry cap, keyed by MD5 of `(num_spins, seed, wild_weight)`
 - Per-IP rate limiter with 60 s sliding window
 - All inputs validated via Pydantic `Field` constraints
@@ -395,10 +420,12 @@ HoldAndSpinFeature(
 <details>
 <summary>🎯 <strong>tuner.py</strong></summary>
 
-- Binary-searches `wild_weight` across 8 iterations × 500K spins
-- Verifies the converged weight with a 3M-spin confirmation run
+- Robbins-Monro stochastic approximation: `x_{k+1} = x_k − (C/k^α)(rtp − target)`
+- Parameters: `C=3.0`, `α=0.6`, up to 20 iterations × 500K spins
+- Polyak-Ruppert averaging of last 5 iterates for final estimate
+- Random seed per evaluation (independent noise — required for RM convergence guarantees)
+- Verifies converged weight with a 3M-spin confirmation run
 - Imports `build_game` from `main.py` — no code duplication
-- Uses `contextlib.redirect_stdout` to suppress inner simulation output
 
 </details>
 
@@ -414,7 +441,7 @@ HoldAndSpinFeature(
 | **Local caching** | All `self.*` attrs cached as locals before the 10M-iteration loop | ~15% overall |
 | **Flat payout lookup** | `(name, count) → float` dict built at `Paytable.__init__` | Eliminates nested dict chain per eval |
 | **Multiprocessing** | `Pool` with deterministic per-worker seeds | Near-linear core scaling |
-| **Welford variance** | Online single-pass algorithm | Numerically stable at 10M+ spins |
+| **Welford variance** | Online single-pass algorithm — numerically stable at any spin count | No catastrophic cancellation |
 
 ### JavaScript Engine
 
@@ -422,6 +449,7 @@ HoldAndSpinFeature(
 |---|---|---|
 | **Web Worker** | Simulation runs off the main thread | UI never blocks; ~no scheduling overhead |
 | **Uint8Array pools** | Reel symbol indices in typed arrays (1 byte/slot vs 8+) | L1-cache fit; faster random access |
+| **Welford variance** | Online single-pass — replaces naive `E[X²]−E[X]²` | Accurate CI at 10M+ spins; no precision loss |
 | **H&S pre-filter** | Coin count checked before `run_hs()` | Skips full H&S setup on ~99.98% of spins |
 | **Chunk size 100K** | 10 `setTimeout` yields per 1M spins vs 50 | Reduces scheduler overhead ~5× |
 
@@ -447,15 +475,17 @@ The worker function is defined at module level (`_simulation_worker`) for Window
 
 **RTP decomposition** — total RTP = base RTP + bonus RTP + H&S RTP. Each tracks wins independently so contributions can be tuned in isolation.
 
-**Variance / Volatility** — Welford's online algorithm accumulates mean and M2 in a single pass. No catastrophic cancellation at large spin counts. Volatility = `sqrt(M2 / n) / bet`.
+**Variance / Volatility** — Welford's online algorithm (both Python and JS engines) accumulates mean and M2 in a single pass. No catastrophic cancellation at large spin counts or large win magnitudes. Volatility = `sqrt(M2 / n) / bet`.
 
-**95% Confidence Interval** — `CI = 1.96 × volatility / sqrt(n)`. At 1M spins and volatility ≈ 8, CI ≈ ±0.016 (1.6%). At 10M spins, CI ≈ ±0.005 (0.5%). Displayed under Total RTP in the web UI.
+**95% Confidence Interval** — `CI = 1.96 × volatility / sqrt(n)`. At 1M spins and volatility ≈ 8, CI ≈ ±0.016 (1.6%). At 10M spins, CI ≈ ±0.005 (0.5%). Displayed under Total RTP in the web UI. Previously absent from the JS engine; now computed from the same Welford accumulator.
+
+**Robbins-Monro convergence** — for a monotone stochastic function `f(x)` with noise `ε_k` s.t. `E[ε_k] = 0`, the RM iterate `x_{k+1} = x_k − a_k·(f(x_k) − target)` converges a.s. to the root when `Σa_k = ∞` and `Σa_k² < ∞`. With `a_k = C/k^0.6`, both conditions hold. Polyak-Ruppert averaging then achieves optimal asymptotic variance.
 
 **Hold & Spin coin probability** — a reel with `CO: 3` out of 53 total weight gives ≈5.7% coin probability per respin position, not a flat override. This makes H&S RTP mathematically consistent with base game reel math.
 
 **Wild evaluation** — leading wilds extend the first non-wild symbol's run. All-wild lines pay the wild's own table. The evaluator always takes the higher of: (substituted run payout) vs (pure-wild prefix payout).
 
-**Scatter payouts** — scatters pay on total count anywhere in the grid, independent of paylines. Scatter positions break line evaluation for non-wild symbols.
+**Scatter payouts** — scatters pay on total count anywhere in the grid, independent of paylines. Scatter positions break line evaluation for non-wild symbols. Scatter count is recorded from the initial spin; cascades do not re-trigger the scatter counter.
 
 **Balance history** — cumulative net balance (`spin_win − bet`) sampled every 1K spins. Merging parallel batches offsets each batch by the final balance of the previous one, producing a continuous random walk.
 
