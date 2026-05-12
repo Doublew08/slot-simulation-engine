@@ -94,6 +94,7 @@ class SimulationRunner:
         reels         = self.reel_engine.reels
         num_rows      = self.reel_engine.num_rows
         num_cols      = len(reels)
+        evaluator     = self.evaluator
         evaluate      = self.evaluator.evaluate
         eval_scatters = self.evaluator.evaluate_scatters
         bonus         = self.bonus_feature
