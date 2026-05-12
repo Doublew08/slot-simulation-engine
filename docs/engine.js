@@ -225,7 +225,8 @@ class Simulation {
         this.hs_coin_prob = parseFloat(coinProbability);
         
         // Jackpot pool setup
-        this.hs_coin_values = [1.0, 2.0, 3.0, 5.0, 10.0, 50.0];
+        // Coin values scaled ×0.906 vs original to hit 95% RTP at 100x feature buy cost
+        this.hs_coin_values = [1.0, 1.8, 2.7, 4.5, 9.0, 45.0];
         this.value_pool = [];
         for(let val of this.hs_coin_values) {
             for(let i=0; i<100; i++) this.value_pool.push(val);
@@ -239,10 +240,10 @@ class Simulation {
     }
     
     _getRandomCoin() {
-        if (Math.random() < 0.0001) return {type: "Major", val: 500.0};
+        if (Math.random() < 0.0001) return {type: "Major", val: 450.0};
         let choice = this.value_pool[Math.floor(Math.random() * this.value_pool.length)];
-        if (choice === "Mini") return {type: "Mini", val: 10.0};
-        if (choice === "Minor") return {type: "Minor", val: 50.0};
+        if (choice === "Mini") return {type: "Mini", val: 9.0};
+        if (choice === "Minor") return {type: "Minor", val: 45.0};
         return {type: "cash", val: parseFloat(choice)};
     }
     
