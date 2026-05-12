@@ -1,48 +1,63 @@
-from typing import Tuple
+from typing import Optional, Tuple
+
 from reels import ReelEngine
 from evaluator import BaseEvaluator
 
+
 class BonusFeature:
     """
-    Manages the triggering and execution of free spins.
+    Free-spins bonus triggered by scatter count.
+
+    Supports an optional separate reel set for the bonus round and a hard
+    cap on total spins to prevent degenerate retrigger loops.
     """
-    def __init__(self, trigger_count: int, num_free_spins: int, multiplier: float = 1.0):
+
+    def __init__(
+        self,
+        trigger_count: int,
+        num_free_spins: int,
+        multiplier: float = 1.0,
+        max_total_spins: int = 500,
+        bonus_reel_engine: Optional[ReelEngine] = None,
+    ):
         self.trigger_count = trigger_count
         self.num_free_spins = num_free_spins
         self.multiplier = multiplier
+        self.max_total_spins = max_total_spins
+        self.bonus_reel_engine = bonus_reel_engine
 
     def check_trigger(self, scatter_count: int) -> bool:
-        """
-        Checks if the free spins feature is triggered.
-        """
         return scatter_count >= self.trigger_count
 
-    def run_free_spins(self, reel_engine: ReelEngine, evaluator: BaseEvaluator) -> Tuple[float, int]:
+    def run_free_spins(
+        self, base_reel_engine: ReelEngine, evaluator: BaseEvaluator
+    ) -> Tuple[float, int]:
         """
-        Runs the free spins feature.
-        Returns (total_payout, actual_spins_played)
+        Runs the free-spins loop.
+
+        Uses bonus_reel_engine if configured, otherwise base_reel_engine.
+        Caps total spins at max_total_spins to prevent infinite retrigger loops.
+
+        Returns (total_payout_multiplier, spins_played).
         """
+        reel_engine = self.bonus_reel_engine or base_reel_engine
         total_payout = 0.0
         spins_remaining = self.num_free_spins
         spins_played = 0
 
-        while spins_remaining > 0:
+        while spins_remaining > 0 and spins_played < self.max_total_spins:
             spins_remaining -= 1
             spins_played += 1
-            
+
             grid = reel_engine.spin()
-            
-            # Evaluate base wins (lines/ways)
+
             spin_payout, _ = evaluator.evaluate(grid)
-            
-            # Evaluate scatters for retriggers/payouts
             scatter_count, scatter_payout = evaluator.evaluate_scatters(grid)
-            
-            # Apply multiplier to lines/ways wins
+
+            # Multiplier applies to line/ways wins; scatter pays face value
             total_payout += (spin_payout * self.multiplier) + scatter_payout
-            
-            # Check for retrigger
+
             if self.check_trigger(scatter_count):
                 spins_remaining += self.num_free_spins
-                
+
         return total_payout, spins_played

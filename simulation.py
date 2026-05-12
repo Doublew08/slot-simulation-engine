@@ -1,162 +1,294 @@
 import csv
 import math
-from typing import Optional
+import multiprocessing
+import random
+from typing import Dict, List, Optional
 
 from reels import ReelEngine
 from evaluator import BaseEvaluator
 from bonus import BonusFeature
 from hold_and_spin import HoldAndSpinFeature
 
+
+# ── Module-level worker (required for multiprocessing.Pool pickling on Windows) ──
+
+def _simulation_worker(args):
+    runner, num_spins, seed = args
+    if seed is not None:
+        random.seed(seed)
+    return runner._run_batch(num_spins, verbose=False)
+
+
+# ── Runner ────────────────────────────────────────────────────────────────────
+
 class SimulationRunner:
-    """
-    Runs the Monte Carlo simulation for the slot game.
-    """
+    """Monte Carlo simulation runner with optional multiprocessing."""
+
     def __init__(
-        self, 
-        reel_engine: ReelEngine, 
+        self,
+        reel_engine: ReelEngine,
         evaluator: BaseEvaluator,
         bet_amount: float = 1.0,
         bonus_feature: Optional[BonusFeature] = None,
-        hold_and_spin_feature: Optional[HoldAndSpinFeature] = None
+        hold_and_spin_feature: Optional[HoldAndSpinFeature] = None,
+        exclusive_features: bool = False,
     ):
         self.reel_engine = reel_engine
         self.evaluator = evaluator
         self.bet_amount = bet_amount
         self.bonus_feature = bonus_feature
         self.hold_and_spin_feature = hold_and_spin_feature
+        # When True, H&S is skipped on spins where the bonus already triggered
+        self.exclusive_features = exclusive_features
 
-    def run(self, num_spins: int, output_csv: str = "results.csv"):
-        print(f"Starting simulation for {num_spins} spins...")
-        total_spent = 0.0
-        
-        base_win_total = 0.0
-        bonus_win_total = 0.0
-        hs_win_total = 0.0
-        
+    # ── Public entry point ────────────────────────────────────────────────────
+
+    def run(
+        self,
+        num_spins: int,
+        output_csv: str = "results.csv",
+        seed: Optional[int] = None,
+        workers: int = 1,
+    ) -> dict:
+        """
+        Run the simulation.
+
+        workers > 1 spawns a multiprocessing.Pool for near-linear core scaling.
+        Each worker receives a unique seed derived from the base seed so results
+        are reproducible when seed is set.
+        """
+        print(
+            f"Starting: {num_spins:,} spins | bet={self.bet_amount}"
+            f" | seed={seed} | workers={workers}"
+        )
+
+        if workers > 1:
+            batch = self._run_parallel(num_spins, seed, workers)
+        else:
+            if seed is not None:
+                random.seed(seed)
+            batch = self._run_batch(num_spins, verbose=True)
+
+        metrics = self._compute_metrics(batch)
+        self._export_csv(output_csv, metrics)
+        self._print_results(metrics)
+        return metrics
+
+    # ── Core simulation loop ──────────────────────────────────────────────────
+
+    def _run_batch(self, num_spins: int, verbose: bool = True) -> dict:
+        """
+        Inner spin loop. Returns raw accumulator dict suitable for merging.
+        Does NOT set random seed — caller is responsible.
+        """
+        base_win = 0.0
+        bonus_win = 0.0
+        hs_win = 0.0
         base_hits = 0
         bonus_triggers = 0
         hs_triggers = 0
         grand_jackpots = 0
-        
-        sum_win = 0.0
-        sum_win_sq = 0.0
-        
-        # Win Buckets
-        buckets = {
-            "0x": 0,
-            ">0x to 1x": 0,
-            ">1x to 5x": 0,
-            ">5x to 15x": 0,
-            ">15x to 50x": 0,
-            ">50x": 0
+
+        # Welford's online variance
+        welf_n = 0
+        welf_mean = 0.0
+        welf_M2 = 0.0
+
+        buckets: Dict[str, int] = {
+            "0x": 0, ">0x to 1x": 0, ">1x to 5x": 0,
+            ">5x to 15x": 0, ">15x to 50x": 0, ">50x": 0,
         }
-        
+        bet = self.bet_amount
+
         for spin_idx in range(num_spins):
-            total_spent += self.bet_amount
-            spin_total_win = 0.0
-            
+            spin_win = 0.0
+
             grid = self.reel_engine.spin()
-            
-            # Base game evaluation
-            base_payout, _ = self.evaluator.evaluate(grid)
-            scatter_count, scatter_payout = self.evaluator.evaluate_scatters(grid)
-            
-            base_spin_win = base_payout + scatter_payout
-            
-            if base_spin_win > 0:
+
+            # Base game
+            bp, _ = self.evaluator.evaluate(grid)
+            sc_count, sc_pay = self.evaluator.evaluate_scatters(grid)
+            bsw = (bp + sc_pay) * bet
+            if bsw > 0:
                 base_hits += 1
-                base_win_total += base_spin_win
-                spin_total_win += base_spin_win
-                
-            # Bonus feature evaluation
-            if self.bonus_feature and self.bonus_feature.check_trigger(scatter_count):
+                base_win += bsw
+                spin_win += bsw
+
+            # Bonus feature
+            bonus_fired = False
+            if self.bonus_feature and self.bonus_feature.check_trigger(sc_count):
+                bonus_fired = True
                 bonus_triggers += 1
-                bonus_payout, _ = self.bonus_feature.run_free_spins(self.reel_engine, self.evaluator)
-                bonus_win_total += bonus_payout
-                spin_total_win += bonus_payout
-                
-            # Hold and Spin evaluation
+                raw, _ = self.bonus_feature.run_free_spins(self.reel_engine, self.evaluator)
+                bw = raw * bet
+                bonus_win += bw
+                spin_win += bw
+
+            # Hold and Spin
             if self.hold_and_spin_feature:
-                triggered, hs_mask, hs_initial_val = self.hold_and_spin_feature.check_trigger(grid)
-                if triggered:
-                    hs_triggers += 1
-                    hs_payout, _, hit_grand = self.hold_and_spin_feature.run_hold_and_spin(hs_mask, hs_initial_val)
-                    hs_win_total += hs_payout
-                    spin_total_win += hs_payout
-                    if hit_grand:
-                        grand_jackpots += 1
-                    
-            sum_win += spin_total_win
-            sum_win_sq += spin_total_win * spin_total_win
-            
-            # Track Buckets
-            win_mult = spin_total_win / self.bet_amount
-            if win_mult == 0:
+                if not self.exclusive_features or not bonus_fired:
+                    triggered, hs_mask, hs_init = self.hold_and_spin_feature.check_trigger(grid)
+                    if triggered:
+                        hs_triggers += 1
+                        raw_hs, _, hit_grand = self.hold_and_spin_feature.run_hold_and_spin(
+                            hs_mask, hs_init
+                        )
+                        hw = raw_hs * bet
+                        hs_win += hw
+                        spin_win += hw
+                        if hit_grand:
+                            grand_jackpots += 1
+
+            # Welford update
+            welf_n += 1
+            delta = spin_win - welf_mean
+            welf_mean += delta / welf_n
+            welf_M2 += delta * (spin_win - welf_mean)
+
+            # Win bucket
+            mult = spin_win / bet
+            if mult == 0:
                 buckets["0x"] += 1
-            elif win_mult <= 1.0:
+            elif mult <= 1.0:
                 buckets[">0x to 1x"] += 1
-            elif win_mult <= 5.0:
+            elif mult <= 5.0:
                 buckets[">1x to 5x"] += 1
-            elif win_mult <= 15.0:
+            elif mult <= 15.0:
                 buckets[">5x to 15x"] += 1
-            elif win_mult <= 50.0:
+            elif mult <= 50.0:
                 buckets[">15x to 50x"] += 1
             else:
                 buckets[">50x"] += 1
-            
-            # Print progress every 1 million spins
-            if (spin_idx + 1) % 1000000 == 0:
-                print(f"Completed {spin_idx + 1} spins...")
-                
-        # Calculate statistics
-        total_win = base_win_total + bonus_win_total + hs_win_total
-        
-        total_rtp = total_win / total_spent if total_spent > 0 else 0
-        base_rtp = base_win_total / total_spent if total_spent > 0 else 0
-        bonus_rtp = bonus_win_total / total_spent if total_spent > 0 else 0
-        hs_rtp = hs_win_total / total_spent if total_spent > 0 else 0
-        
-        hit_rate = base_hits / num_spins if num_spins > 0 else 0
-        bonus_freq = num_spins / bonus_triggers if bonus_triggers > 0 else 0
-        hs_freq = num_spins / hs_triggers if hs_triggers > 0 else 0
-        grand_freq = num_spins / grand_jackpots if grand_jackpots > 0 else 0
-        
-        mean_win = sum_win / num_spins if num_spins > 0 else 0
-        variance = (sum_win_sq / num_spins) - (mean_win ** 2) if num_spins > 0 else 0
-        volatility = math.sqrt(max(0, variance)) / self.bet_amount if variance > 0 else 0
-        
-        metrics = {
-            "Total Spins": num_spins,
-            "Total RTP": total_rtp,
-            "Base RTP": base_rtp,
-            "Bonus RTP": bonus_rtp,
-            "Hold and Spin RTP": hs_rtp,
-            "Base Hit Rate": hit_rate,
-            "Bonus Trigger Frequency (1 in X)": bonus_freq,
-            "Hold and Spin Frequency (1 in X)": hs_freq,
-            "Grand Jackpot Frequency (1 in X)": grand_freq,
-            "Volatility": volatility
+
+            if verbose and (spin_idx + 1) % 1_000_000 == 0:
+                print(f"  {spin_idx + 1:,} spins complete...")
+
+        return {
+            "num_spins": num_spins,
+            "base_win": base_win,
+            "bonus_win": bonus_win,
+            "hs_win": hs_win,
+            "base_hits": base_hits,
+            "bonus_triggers": bonus_triggers,
+            "hs_triggers": hs_triggers,
+            "grand_jackpots": grand_jackpots,
+            "welf_n": welf_n,
+            "welf_mean": welf_mean,
+            "welf_M2": welf_M2,
+            "buckets": buckets,
         }
-        
-        for k, v in buckets.items():
+
+    # ── Parallel orchestration ────────────────────────────────────────────────
+
+    def _run_parallel(self, num_spins: int, seed: Optional[int], workers: int) -> dict:
+        chunk = num_spins // workers
+        remainder = num_spins % workers
+        chunks = [chunk + (1 if i < remainder else 0) for i in range(workers)]
+        # Deterministic per-worker seeds; None → OS entropy per worker
+        seeds = [seed + i if seed is not None else None for i in range(workers)]
+
+        print(f"  Workers: {workers} | chunks: {chunks[0]}×{workers - remainder}"
+              + (f" + {chunks[0]+1}×{remainder}" if remainder else ""))
+
+        args = list(zip([self] * workers, chunks, seeds))
+        with multiprocessing.Pool(processes=workers) as pool:
+            batches = pool.map(_simulation_worker, args)
+
+        return SimulationRunner._merge_batches(batches)
+
+    @staticmethod
+    def _merge_batches(batches: List[dict]) -> dict:
+        """Merge accumulator dicts from parallel workers using parallel Welford."""
+        merged = {
+            "num_spins":      sum(b["num_spins"]      for b in batches),
+            "base_win":       sum(b["base_win"]        for b in batches),
+            "bonus_win":      sum(b["bonus_win"]       for b in batches),
+            "hs_win":         sum(b["hs_win"]          for b in batches),
+            "base_hits":      sum(b["base_hits"]       for b in batches),
+            "bonus_triggers": sum(b["bonus_triggers"]  for b in batches),
+            "hs_triggers":    sum(b["hs_triggers"]     for b in batches),
+            "grand_jackpots": sum(b["grand_jackpots"]  for b in batches),
+            "buckets": {
+                k: sum(b["buckets"][k] for b in batches)
+                for k in batches[0]["buckets"]
+            },
+        }
+
+        # Parallel Welford merge (Chan et al. 1979)
+        n    = batches[0]["welf_n"]
+        mean = batches[0]["welf_mean"]
+        M2   = batches[0]["welf_M2"]
+        for b in batches[1:]:
+            n2, m2, M2_2 = b["welf_n"], b["welf_mean"], b["welf_M2"]
+            n_new = n + n2
+            if n_new == 0:
+                continue
+            delta = m2 - mean
+            mean  = mean + delta * n2 / n_new
+            M2    = M2 + M2_2 + delta ** 2 * n * n2 / n_new
+            n     = n_new
+
+        merged.update({"welf_n": n, "welf_mean": mean, "welf_M2": M2})
+        return merged
+
+    # ── Metrics computation ───────────────────────────────────────────────────
+
+    def _compute_metrics(self, b: dict) -> dict:
+        num_spins = b["num_spins"]
+        bet = self.bet_amount
+        # Single multiplication — no float accumulation error
+        total_wagered = num_spins * bet
+        total_win = b["base_win"] + b["bonus_win"] + b["hs_win"]
+
+        def safe_div(n, d):
+            return n / d if d > 0 else 0.0
+
+        bt = b["bonus_triggers"]
+        ht = b["hs_triggers"]
+        gj = b["grand_jackpots"]
+
+        variance  = b["welf_M2"] / b["welf_n"] if b["welf_n"] > 1 else 0.0
+        volatility = math.sqrt(variance) / bet if variance > 0 else 0.0
+
+        metrics = {
+            "Total Spins":                       num_spins,
+            "Total RTP":                         safe_div(total_win,       total_wagered),
+            "Base RTP":                          safe_div(b["base_win"],   total_wagered),
+            "Bonus RTP":                         safe_div(b["bonus_win"],  total_wagered),
+            "Hold and Spin RTP":                 safe_div(b["hs_win"],     total_wagered),
+            "Base Hit Rate":                     safe_div(b["base_hits"],  num_spins),
+            "Bonus Trigger Frequency (1 in X)":  safe_div(num_spins, bt),
+            "Hold and Spin Frequency (1 in X)":  safe_div(num_spins, ht),
+            "Grand Jackpot Frequency (1 in X)":  safe_div(num_spins, gj),
+            "Avg Win Per Spin":                  safe_div(total_win,       num_spins),
+            "Avg Bonus Win":                     safe_div(b["bonus_win"],  bt),
+            "Avg Hold and Spin Win":             safe_div(b["hs_win"],     ht),
+            "Volatility":                        volatility,
+        }
+        for k, v in b["buckets"].items():
             metrics[f"Bucket: {k} (%)"] = (v / num_spins) * 100
-        
-        self._export_csv(output_csv, metrics)
-        
-        print("\n--- Simulation Results ---")
-        for k, v in metrics.items():
-            if "RTP" in k or "Rate" in k or "Bucket" in k:
-                print(f"{k}: {v:.2f}%")
-            elif "Frequency" in k:
-                print(f"{k}: {v:.1f}")
-            else:
-                print(f"{k}: {v:.4f}")
-                
+
         return metrics
 
-    def _export_csv(self, filename: str, metrics: dict):
-        with open(filename, 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile)
+    # ── Output ────────────────────────────────────────────────────────────────
+
+    def _print_results(self, metrics: dict) -> None:
+        print("\n--- Simulation Results ---")
+        for k, v in metrics.items():
+            if "Bucket" in k:
+                print(f"  {k}: {v:.4f}%")
+            elif "RTP" in k or "Rate" in k:
+                print(f"  {k}: {v:.4%}")
+            elif "Frequency" in k:
+                print(f"  {k}: 1 in {v:.1f}")
+            elif "Avg" in k:
+                print(f"  {k}: {v:.4f}")
+            else:
+                print(f"  {k}: {v:.4f}")
+
+    def _export_csv(self, filename: str, metrics: dict) -> None:
+        with open(filename, "w", newline="") as f:
+            writer = csv.writer(f)
             writer.writerow(["Metric", "Value"])
             for k, v in metrics.items():
                 writer.writerow([k, v])

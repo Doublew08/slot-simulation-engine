@@ -1,84 +1,160 @@
-# 🎰 Professional Slot Game Simulation Engine
+# Slot Game Simulation Engine
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Build](https://img.shields.io/badge/build-passing-brightgreen)
-![Version](https://img.shields.io/badge/version-2.0.0-orange)
+A Monte Carlo simulation engine for slot game math design. Models a full 5×3 reel game with Lines or Ways evaluation, free-spins bonus, and Hold & Spin — the same features used in commercial titles.
 
-A comprehensive, industry-standard Monte Carlo simulation engine and web-based Math Design Suite. Designed to replicate the proprietary auditing tools used by professional mathematicians at tier-1 casino gaming suppliers (e.g., IGT, Aristocrat, Light & Wonder).
-
-This engine rapidly simulates millions of mathematical permutations to converge on theoretical probabilities, ensuring math models hit target payouts, remain profitable for the house, and are engaging for the player.
-
-[**Launch the Live Math Suite**](https://doublew08.github.io/slot-simulation-engine/)
+Designed to compute theoretical RTP, volatility, hit rates, and win distributions with statistical accuracy across millions of spins.
 
 ---
 
-## 🌟 Key Features
+## Architecture
 
-### Advanced Core Engine Mechanics
-*   **243-Ways Evaluation:** Accurate left-to-right calculations with full Wild substitution support.
-*   **Cascading / Tumble Reels (Megaways-Style):** Dynamic grid evaluation where winning combinations explode, columns shift down, and new symbols are injected from reel strips. A single spin can theoretically cascade infinitely.
-*   **Hold & Spin with Strength Levels:** Independent reel spin mechanics featuring Jackpots (Mini, Minor, Major, Grand). Includes hidden "Strength Levels" (Weak, Normal, Strong, Ultra) that dictate coin drop probabilities.
-*   **Symbol Upgrades:** Locked coins in Hold & Spin are not static. Coins have a probability to mathematically level up (e.g., doubling in cash value or upgrading Jackpots).
-*   **Networked Progressive Jackpots:** Simulates a persistent global progressive pool. Skims exactly `0.5%` off every bet, allowing the progressive jackpot to scale accurately over millions of spins.
-*   **Feature Buy Mode (Bonus Buy):** Simulates bypassing the base game by deducting 100x the bet size and forcefully dropping 6 coins to trigger Hold & Spin, allowing for independent RTP auditing of the bonus buy.
-
-### The Math Studio Web Application
-A massively parallel client-side JavaScript architecture wrapped in a premium **Glassmorphism Aesthetic**.
-
-*   **Monte Carlo Dashboard:** Run up to 50,000,000 spins in seconds. Dumps a complete breakdown of Total RTP, Base RTP, Bonus RTP, Hit Rates, Volatility Index, and Win Buckets (Log Scale).
-*   **Reel Editor:** Dynamically change the base weight of every single symbol and inject the math straight into the simulator.
-*   **Visualizer:** A playable 3x5 visual grid with Auto-Spin, win pulse animations, and a fully functional Web Audio API synthesizer.
-*   **Production JSON PAR Sheet Exporter:** 1-click export of the Paytable, Reel Strips, and math configuration into a standard `math_config.json` payload—mirroring how math departments hand off models to front-end developers.
-
-### Machine Learning & Risk Analysis
-*   **Genetic Auto-Balancer Studio:** A standalone ML-powered tool. Enter a "Target RTP" (e.g., 96.00%), and a custom Genetic Algorithm will spawn populations of reel weights, simulate spins, cross-breed the most accurate models, and apply mutations to mathematically evolve the perfect reel strips.
-*   **Session Risk Simulator:** Models 5,000+ unique human players given a specific Bankroll and Bet Size over a timeframe (e.g., 30 minutes). Outputs precise **Risk of Ruin** metrics and end-balance distribution histograms.
-
----
-
-## 🧮 Understanding The Math Metrics
-
-*   **RTP (Return to Player):** The theoretical percentage of wagered money paid back over millions of spins. (e.g., 95% RTP means the house retains a 5% edge).
-*   **Volatility Index:** A measure of variance. High Volatility = infrequent but massive wins. Low Volatility = frequent but small wins.
-*   **Hit Rate:** The percentage of spins that result in any payout greater than zero.
-*   **Risk of Ruin:** The statistical probability that a player will hit a bankroll of $0.00 during a given session.
-
----
-
-## 🛠️ Repository Structure
-
-```text
-/
-├── main.py                # Original Python-based Monte Carlo Runner
-├── simulation.py          # Python Engine Simulator Logic
-├── hold_and_spin.py       # Python Feature Mechanics
-├── docs/                  # Web App Deployment Directory (GitHub Pages)
-│   ├── index.html         # Main Math Studio Dashboard
-│   ├── balancer.html      # Genetic Auto-Balancer UI
-│   ├── engine.js          # Core JavaScript Monte Carlo Engine
-│   ├── app.js             # Web App Logic & Charting
-│   ├── balancer.js        # Genetic Algorithm Engine
-│   └── styles.css         # Glassmorphism UI Styles
+```
+main.py            Entry point + build_game() factory
+paytable.py        Symbol definitions and payout lookups
+reels.py           Weighted reel strips and grid generation
+evaluator.py       Win evaluation — Lines (20-payline) and Ways (243)
+bonus.py           Free-spins feature with retrigger cap
+hold_and_spin.py   Hold & Spin with jackpots and reel-accurate respins
+simulation.py      Monte Carlo runner — stats, RTP, volatility, CSV export
+tuner.py           Binary-search wild weight to hit a target RTP
+visualize.py       Matplotlib charts from results.csv
+tests.py           40 unit tests (run: python tests.py)
 ```
 
 ---
 
-## 🚀 How to Run Locally
+## Quick Start
 
-If you wish to run the web application locally instead of using the live GitHub Pages link:
+```bash
+# Default: 1,000,000 spins
+python main.py
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Doublew08/slot-simulation-engine.git
-   ```
-2. Navigate to the `docs/` folder:
-   ```bash
-   cd slot-simulation-engine/docs
-   ```
-3. Open `index.html` in any modern web browser. No local web server or dependencies are required.
+# Custom spins + reproducible seed
+python main.py 5000000 42
 
-## 🤝 Contributing
-This engine is designed for mathematical analysis and game development purposes. Contributions, feature requests, and math optimizations are always welcome! 
+# Tune wild weight to hit 95% RTP
+python tuner.py 0.95
 
-## ⚖️ License
-This project is licensed under the MIT License - see the LICENSE file for details. Note: All probability calculations and game mechanics generated by this simulator should be validated according to the gaming regulations in your specific jurisdiction before commercial deployment.
+# Visualize last run
+python visualize.py
+```
+
+---
+
+## Output
+
+```
+--- Simulation Results ---
+  Total RTP: 94.8231%
+  Base RTP: 61.2140%
+  Bonus RTP: 22.5040%
+  Hold and Spin RTP: 11.1051%
+  Base Hit Rate: 30.2184%
+  Bonus Trigger Frequency (1 in X): 1 in 148.3
+  Hold and Spin Frequency (1 in X): 1 in 982.7
+  Grand Jackpot Frequency (1 in X): 1 in 187,432.0
+  Avg Win Per Spin: 0.9482
+  Volatility: 8.34
+```
+
+Results export to `results.csv` automatically.
+
+---
+
+## Game Configuration (`main.py`)
+
+All game parameters live in `build_game()`:
+
+```python
+# Symbol paytable
+Symbol(name="H1", payouts={3: 0.4, 4: 1.5, 5: 5.0})
+
+# Reel weights per column (higher weight = more frequent)
+base_weights = {"W": 4.238, "H1": 4, "H2": 5, ..., "CO": 3}
+
+# Free-spins bonus
+BonusFeature(trigger_count=3, num_free_spins=10, multiplier=2.0, max_total_spins=500)
+
+# Hold & Spin
+HoldAndSpinFeature(
+    trigger_count=6,
+    coin_values=[1.0, 2.0, 3.0, 5.0, 10.0, 50.0],
+    jackpots={"Mini": 10.0, "Minor": 50.0, "Major": 500.0, "Grand": 5000.0}
+)
+```
+
+---
+
+## Module Details
+
+### `reels.py` — `Reel`, `ReelEngine`
+
+- `Reel(symbol_weights)` — weighted symbol pool, spun via `random.choices`
+- `spin_one()` — single-position spin used by Hold & Spin respins
+- `ReelEngine.spin()` → `grid[row][col]` (row-major, 3×5)
+
+### `evaluator.py` — `LinesEvaluator`, `WaysEvaluator`
+
+- `LinesEvaluator(paytable, paylines)` — evaluates 20 fixed paylines left-to-right with wild substitution; scatters break lines
+- `WaysEvaluator(paytable)` — computes all left-to-right symbol combinations; ways = product of matching positions per reel
+- Both expose `evaluate(grid)` → `(payout, wins)` and `evaluate_scatters(grid)` → `(count, payout)`
+
+### `bonus.py` — `BonusFeature`
+
+- Triggers on `scatter_count >= trigger_count`
+- Supports separate `bonus_reel_engine` for bonus-round strips
+- `max_total_spins` cap prevents infinite retrigger loops
+- Returns raw payout multipliers; `simulation.py` scales by `bet_amount`
+
+### `hold_and_spin.py` — `HoldAndSpinFeature`
+
+- Respins use `reel_engine.reels[col].spin_one()` — coin probability derives from actual reel weights, not a separate flat parameter
+- 3 lives (respins); resets on each new coin
+- Full-screen fill → Grand jackpot added on top of coin totals
+- Mini/Minor jackpots via weighted pool; Major via rare 0.01% draw
+
+### `simulation.py` — `SimulationRunner`
+
+- Welford's online algorithm for variance (numerically stable at 10M+ spins)
+- All feature payouts scaled by `bet_amount` before accumulation
+- `seed` parameter for reproducible runs
+- Tracks: total/base/bonus/H&S RTP, hit rates, trigger frequencies, average wins, volatility, win buckets
+
+### `tuner.py`
+
+- Binary-searches `wild_weight` in 8 iterations × 100K spins
+- Verifies converged weight with a 3M-spin run
+- Uses `contextlib.redirect_stdout` (no `builtins.print` monkey-patching)
+- Imports `build_game` from `main.py` — zero code duplication
+
+---
+
+## Running Tests
+
+```bash
+python tests.py
+```
+
+40 tests covering: Paytable lookups, LinesEvaluator (3-oak, 4-oak, 5-oak, wild substitution, scatter isolation, multi-payline accumulation), WaysEvaluator (ways product, wild contribution, gap breaking), BonusFeature (retrigger cap, multiplier scaling, bonus reel override), HoldAndSpinFeature (trigger threshold, grand jackpot, respin counter, reel-weight coin probability), and ReelEngine grid shape.
+
+Key design choice: `LinesEvaluator` tests use a single middle payline, and `WaysEvaluator` tests use a filler symbol not present in the paytable — both prevent accidental wins on adjacent rows/reels from polluting assertions.
+
+---
+
+## Math Notes
+
+**RTP decomposition** — total RTP = base RTP + bonus RTP + H&S RTP. Each tracks wins and wagered amounts independently so contributions can be tuned separately.
+
+**Volatility** — standard deviation of win-per-spin divided by bet size. Higher = less frequent but larger wins.
+
+**Hold & Spin math** — respins pull from the actual reel strip distribution. A reel with `CO: 3` out of 53 total weight gives ~5.7% coin probability during respins, not a flat override. This keeps H&S RTP mathematically consistent with the base game.
+
+**Wild evaluation** — wilds substitute left-to-right. A leading wild extends the first non-wild symbol's run. An all-wild line pays the wild symbol's own table. The evaluator also checks if a leading-wild-only run pays better than the substituted symbol run and takes the higher of the two.
+
+**Scatter payouts** — scatters pay on total bet (any position); line evaluations skip scatter positions rather than treating them as blanks.
+
+---
+
+## License
+
+MIT. Mathematical outputs should be validated against gaming regulations in your jurisdiction before commercial use.

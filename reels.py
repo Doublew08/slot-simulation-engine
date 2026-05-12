@@ -10,10 +10,10 @@ class Reel:
         self.weights = list(symbol_weights.values())
 
     def spin_column(self, num_rows: int) -> List[str]:
-        """
-        Returns a list of symbols representing a column on the screen.
-        """
         return random.choices(self.symbols, weights=self.weights, k=num_rows)
+
+    def spin_one(self) -> str:
+        return random.choices(self.symbols, weights=self.weights, k=1)[0]
 
 
 class ReelEngine:
@@ -31,11 +31,5 @@ class ReelEngine:
         # Generate each column independently
         columns = [reel.spin_column(self.num_rows) for reel in self.reels]
         
-        num_cols = len(self.reels)
-        # Transpose columns into rows: grid[row][col]
-        grid = []
-        for r in range(self.num_rows):
-            row = [columns[c][r] for c in range(num_cols)]
-            grid.append(row)
-            
-        return grid
+        # Transpose columns → rows via zip (C-level, no manual loop)
+        return [list(row) for row in zip(*columns)]
