@@ -14,13 +14,15 @@ import json
 import os
 import sys
 import threading
+import time
 import webbrowser
+from collections import defaultdict
 from typing import Annotated, Optional
 
 from pydantic import Field
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,16 +35,32 @@ from main import build_game
 app = FastAPI(title="Slot Simulation API", docs_url="/api/docs")
 
 _result_cache: dict = {}
+_ip_hits: dict = defaultdict(list)
+_RATE_WINDOW = 60  # seconds
 
 def _cache_key(req) -> str:
     raw = f"{req.num_spins}:{req.seed}:{req.wild_weight}"
     return hashlib.md5(raw.encode()).hexdigest()
 
+def _check_rate(ip: str, bucket: str, max_req: int) -> None:
+    key = f"{ip}:{bucket}"
+    now = time.time()
+    hits = [t for t in _ip_hits[key] if now - t < _RATE_WINDOW]
+    if len(hits) >= max_req:
+        raise HTTPException(status_code=429, detail=f"Rate limit: max {max_req} requests per minute.")
+    hits.append(now)
+    _ip_hits[key] = hits
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://doublew08.github.io",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://localhost:3000",
+    ],
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type"],
 )
 
 SSE_HEADERS = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
@@ -56,9 +74,9 @@ class SimulateRequest(BaseModel):
 
 
 class TuneRequest(BaseModel):
-    target_rtp: float = 0.95
-    iterations: int = 8
-    spins_per_iter: int = 500_000
+    target_rtp:     Annotated[float, Field(ge=0.50, le=1.0)]          = 0.95
+    iterations:     Annotated[int,   Field(ge=1,    le=20)]           = 8
+    spins_per_iter: Annotated[int,   Field(ge=10_000, le=1_000_000)] = 500_000
 
 
 def _sse(msg: dict) -> str:
@@ -71,7 +89,8 @@ def health():
 
 
 @app.post("/api/simulate")
-async def simulate(req: SimulateRequest):
+async def simulate(req: SimulateRequest, request: Request):
+    _check_rate(request.client.host, "sim", 10)
     key = _cache_key(req)
     if key in _result_cache:
         return _result_cache[key]
@@ -129,7 +148,8 @@ async def simulate(req: SimulateRequest):
 
 
 @app.post("/api/tune")
-async def tune(req: TuneRequest):
+async def tune(req: TuneRequest, request: Request):
+    _check_rate(request.client.host, "tune", 3)
     loop = asyncio.get_event_loop()
     aq: asyncio.Queue = asyncio.Queue()
 
