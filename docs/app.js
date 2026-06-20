@@ -64,6 +64,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    // --- PRELOAD IMAGES ---
+    const preloadedImages = [];
+    ALLOWED_SYMS.forEach(sym => {
+        const img = new Image();
+        img.src = `assets/${sym}.webp`;
+        preloadedImages.push(img);
+    });
+
     // --- AUDIO TOGGLE ---
     const audioToggleBtn = document.getElementById('audioToggleBtn');
     audioToggleBtn.addEventListener('click', () => {
@@ -116,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     for (let r = 0; r < 3; r++) {
         for (let c = 0; c < 5; c++) {
             let sym = initGrid[r][c];
-            initSlotCells[initIdx].innerHTML = `<img src="assets/${sym}.jpg" class="symbol-img" alt="${sym}">`;
+            initSlotCells[initIdx].innerHTML = `<img src="assets/${sym}.webp" class="symbol-img" alt="${sym}">`;
             initSlotCells[initIdx].className = `slot-cell sym-${sym}`;
             initIdx++;
         }
@@ -685,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (let r = 0; r < 3; r++) {
                     let randSym = allSymbols[Math.floor(Math.random() * allSymbols.length)];
                     let flatIndex = r * 5 + col;
-                    slotCells[flatIndex].innerHTML = `<img src="assets/${randSym}.jpg" class="symbol-img blur-spin" alt="${randSym}">`;
+                    slotCells[flatIndex].innerHTML = `<img src="assets/${randSym}.webp" class="symbol-img blur-spin" alt="${randSym}">`;
                     slotCells[flatIndex].className = `slot-cell sym-${randSym}`;
                 }
             }, 50);
@@ -700,7 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 for (let r = 0; r < 3; r++) {
                     let sym = finalGrid[r][col];
                     let flatIndex = r * 5 + col;
-                    slotCells[flatIndex].innerHTML = `<img src="assets/${sym}.jpg" class="symbol-img" alt="${sym}">`;
+                    slotCells[flatIndex].innerHTML = `<img src="assets/${sym}.webp" class="symbol-img" alt="${sym}">`;
                     slotCells[flatIndex].className = `slot-cell sym-${sym}`;
                     
                     // Add landing animation
