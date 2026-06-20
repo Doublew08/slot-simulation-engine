@@ -105,6 +105,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // INITIAL POPULATION OF SLOT GRID
+    const initSlotCells = document.querySelectorAll('.slot-cell');
+    const initGrid = [
+        ["H1", "M1", "W",  "H2", "M2"],
+        ["L1", "W",  "SC", "W",  "L2"],
+        ["M2", "L2", "H1", "M1", "CO"]
+    ];
+    let initIdx = 0;
+    for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 5; c++) {
+            let sym = initGrid[r][c];
+            initSlotCells[initIdx].innerHTML = `<img src="assets/${sym}.jpg" class="symbol-img" alt="${sym}">`;
+            initSlotCells[initIdx].className = `slot-cell sym-${sym}`;
+            initIdx++;
+        }
+    }
+
     // --- FULLSCREEN TOGGLE ---
     const fullscreenToggle = document.getElementById('fullscreenToggle');
     fullscreenToggle.addEventListener('click', () => {
@@ -627,17 +644,18 @@ document.addEventListener('DOMContentLoaded', () => {
             sessProgressContainer.style.display = 'none';
         });
     }
-
     // --- VISUAL SPIN LOGIC ---
     const spinOnceBtn = document.getElementById('spinOnceBtn');
     const autoSpinBtn = document.getElementById('autoSpinBtn');
     const slotCells = document.querySelectorAll('.slot-cell');
-    const winDisplay = document.getElementById('winDisplay');
+    let isSpinning = false;
+    let autoSpinning = false;
     
     function doVisualSpin() {
-        // Must resume AudioContext on first user interaction if locked
+        if (isSpinning) return;
+        isSpinning = true;
+        
         if(audioCtx.state === 'suspended') audioCtx.resume();
-
         playSpinSound();
 
         if (!currentSim) {
@@ -645,45 +663,83 @@ document.addEventListener('DOMContentLoaded', () => {
             currentSim.setupGame(getCustomWeights(), 0.05);
         }
         
+        // Generate the outcome
         let cascade_res = currentSim.run_cascade_spin();
-        let grid = cascade_res.final_grid;
+        let finalGrid = cascade_res.final_grid;
         
-        slotCells.forEach(cell => cell.classList.remove('win-pulse'));
+        slotCells.forEach(cell => {
+            cell.classList.remove('win-pulse');
+            cell.classList.add('spinning');
+        });
+        winDisplay.innerText = "SPINNING...";
         
-        let flatIndex = 0;
-        for (let r = 0; r < 3; r++) {
-            for (let c = 0; c < 5; c++) {
-                let sym = grid[r][c];
-                slotCells[flatIndex].innerText = sym;
-                slotCells[flatIndex].className = `slot-cell sym-${sym}`;
-                flatIndex++;
-            }
-        }
+        const allSymbols = ["W", "H1", "H2", "M1", "M2", "L1", "L2", "SC", "CO"];
         
+        // Setup shuffle intervals for each column (reel)
+        const columns = [0, 1, 2, 3, 4];
+        let shuffleIntervals = [];
+        
+        columns.forEach(col => {
+            let interval = setInterval(() => {
+                // Update the 3 cells in this column with random symbols
+                for (let r = 0; r < 3; r++) {
+                    let randSym = allSymbols[Math.floor(Math.random() * allSymbols.length)];
+                    let flatIndex = r * 5 + col;
+                    slotCells[flatIndex].innerHTML = `<img src="assets/${randSym}.jpg" class="symbol-img blur-spin" alt="${randSym}">`;
+                    slotCells[flatIndex].className = `slot-cell sym-${randSym}`;
+                }
+            }, 50);
+            shuffleIntervals.push(interval);
+        });
+        
+        // Staggered stopping
+        columns.forEach((col, idx) => {
+            setTimeout(() => {
+                clearInterval(shuffleIntervals[col]);
+                playCoinSound(); // Small tick sound for reel stop
+                for (let r = 0; r < 3; r++) {
+                    let sym = finalGrid[r][col];
+                    let flatIndex = r * 5 + col;
+                    slotCells[flatIndex].innerHTML = `<img src="assets/${sym}.jpg" class="symbol-img" alt="${sym}">`;
+                    slotCells[flatIndex].className = `slot-cell sym-${sym}`;
+                    
+                    // Add landing animation
+                    let img = slotCells[flatIndex].querySelector('.symbol-img');
+                    img.style.animation = "land 0.3s ease-out";
+                }
+                
+                // If it's the last reel, evaluate wins
+                if (idx === 4) {
+                    isSpinning = false;
+                    evaluateVisualWin(cascade_res);
+                }
+            }, 500 + (idx * 300)); // 500ms, 800ms, 1100ms, 1400ms, 1700ms
+        });
+    }
+    
+    function evaluateVisualWin(cascade_res) {
         let total = cascade_res.payout + cascade_res.scatter_payout;
         let text = `WIN: ${total.toFixed(2)}`;
         
-        let isBigWin = false;
-
+        if (total > 0) playWinSound();
+        
         if (cascade_res.scatters >= 3) {
             text += ` | FREE SPINS!`;
-            isBigWin = true;
-            slotCells.forEach(cell => { if(cell.innerText === 'SC') cell.classList.add('win-pulse'); });
+            slotCells.forEach(cell => { 
+                if(cell.querySelector('img') && cell.querySelector('img').alt === 'SC') 
+                    cell.classList.add('win-pulse'); 
+            });
         }
         if (cascade_res.hs_triggered) {
             text += ` | HOLD & SPIN: ${cascade_res.hs_payout.toFixed(2)}`;
-            isBigWin = true;
-            slotCells.forEach(cell => { if(cell.innerText === 'CO') cell.classList.add('win-pulse'); });
+            slotCells.forEach(cell => { 
+                if(cell.querySelector('img') && cell.querySelector('img').alt === 'CO') 
+                    cell.classList.add('win-pulse'); 
+            });
         }
-        
         if (cascade_res.hs_grand) {
             text = `💰 PROGRESSIVE JACKPOT HIT! 💰`;
-            slotCells.forEach(cell => cell.classList.add('win-pulse')); 
             playJackpotSound();
-        } else if (isBigWin || total > 5.0) {
-            isBigWin = true;
-            slotCells.forEach(cell => { if(cell.innerText === 'W') cell.classList.add('win-pulse'); });
-            playWinSound();
         } else if (total > 0) {
             playTone(400, 'sine', 0.1, 0.05);
         }

@@ -336,7 +336,7 @@ small { display: block; margin-top: 0.5rem; color: #64748b; font-size: 0.8rem; }
 .slot-cell {
     background: #1e293b;
     height: 120px;
-    border-radius: 8px;
+    border-radius: 12px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -346,12 +346,47 @@ small { display: block; margin-top: 0.5rem; color: #64748b; font-size: 0.8rem; }
     color: white;
     border: 2px solid #334155;
     transition: all 0.3s ease;
-    box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+    overflow: hidden;
+    position: relative;
 }
 
-.slot-cell.sym-W { color: var(--wild-color); text-shadow: 0 0 10px var(--wild-color); border-color: var(--wild-color); }
-.slot-cell.sym-SC { color: var(--scatter-color); text-shadow: 0 0 10px var(--scatter-color); border-color: var(--scatter-color); }
-.slot-cell.sym-CO { color: var(--coin-color); text-shadow: 0 0 10px var(--coin-color); border-color: var(--coin-color); }
+.symbol-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+    transform: scale(0.95);
+    transition: transform 0.2s;
+}
+
+.blur-spin {
+    filter: blur(8px);
+    transform: scale(1.1) translateY(10px);
+    opacity: 0.8;
+}
+
+@keyframes land {
+    0% { transform: translateY(-50px) scale(1.1); filter: blur(5px); opacity: 0.5; }
+    60% { transform: translateY(10px) scale(0.95); filter: blur(0px); opacity: 1; }
+    100% { transform: translateY(0) scale(0.95); }
+}
+
+.slot-cell.sym-W { border-color: #a855f7; box-shadow: 0 0 15px rgba(168, 85, 247, 0.4), inset 0 0 20px rgba(0,0,0,0.8); }
+.slot-cell.sym-SC { border-color: #ec4899; box-shadow: 0 0 15px rgba(236, 72, 153, 0.4), inset 0 0 20px rgba(0,0,0,0.8); }
+.slot-cell.sym-CO { border-color: #fbbf24; box-shadow: 0 0 15px rgba(251, 191, 36, 0.4), inset 0 0 20px rgba(0,0,0,0.8); }
+.slot-cell.sym-H1 { border-color: #f59e0b; }
+.slot-cell.sym-H2 { border-color: #3b82f6; }
+.slot-cell.sym-M1 { border-color: #ef4444; }
+.slot-cell.sym-M2 { border-color: #10b981; }
+
+.slot-cell.win-pulse .symbol-img {
+    animation: pop 0.5s ease infinite alternate;
+}
+@keyframes pop {
+    0% { transform: scale(0.95); }
+    100% { transform: scale(1.1); filter: brightness(1.2); }
+}
 
 .win-display {
     font-family: 'Space Grotesk', sans-serif;
