@@ -1,4 +1,4 @@
-import random
+import random, secrets
 from typing import Dict, List, Optional, Tuple
 
 from reels import ReelEngine
@@ -43,11 +43,13 @@ class HoldAndSpinFeature:
         # Weighted pool: coin values + Mini/Minor jackpots.
         # Major drawn via separate probability; Grand is full-screen only.
         # Defaults: Mini ≈ 0.83%, Minor ≈ 0.165% of the pool.
+        # Default to decreasing weights for coin values to make higher values rarer.
+        coin_weights = [max(1, int(coin_weight * (0.6 ** i))) for i in range(len(coin_values))]
         self._pool_values: List = list(coin_values) + ["Mini", "Minor"]
-        self._pool_weights: List[int] = [coin_weight] * len(coin_values) + [mini_weight, minor_weight]
+        self._pool_weights: List[int] = coin_weights + [mini_weight, minor_weight]
 
     def _get_random_coin_value(self) -> float:
-        if random.random() < self.major_probability:
+        if secrets.SystemRandom().random() < self.major_probability:
             return self.jackpots.get("Major", 500.0)
         val = random.choices(self._pool_values, weights=self._pool_weights, k=1)[0]
         if isinstance(val, str):

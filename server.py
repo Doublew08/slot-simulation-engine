@@ -42,6 +42,7 @@ app = FastAPI(title="Slot Simulation API", docs_url="/api/docs")
 
 _result_cache: dict = {}
 _cache_lock          = threading.Lock()   # guards _result_cache across daemon threads
+_seed_lock           = threading.Lock()   # guards random.seed() globally
 _ip_hits: dict      = defaultdict(list)
 _rate_lock           = threading.Lock()   # guards atomic read-modify-write on _ip_hits
 _RATE_WINDOW         = 60   # seconds
@@ -179,23 +180,36 @@ def health():
 @app.post("/api/simulate")
 async def simulate(req: SimulateRequest, request: Request):
     _check_rate(_real_ip(request), "sim", 10)
-    key    = _cache_key(req)
-    cached = _cache_get(key)
-    if cached:
-        return cached
+    
+    if req.seed is not None:
+        key = _cache_key(req)
+        cached = _cache_get(key)
+        if cached:
+            return cached
+    else:
+        key = None
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     future: asyncio.Future = loop.create_future()
 
     def run_thread():
         try:
             runner = build_game(req.wild_weight)
-            metrics = runner.run(
-                num_spins=req.num_spins,
-                output_csv=None,
-                seed=req.seed,
-                workers=1,  # multiprocessing unreliable on Render containers
-            )
+            if req.seed is not None:
+                with _seed_lock:
+                    metrics = runner.run(
+                        num_spins=req.num_spins,
+                        output_csv=None,
+                        seed=req.seed,
+                        workers=1,  # multiprocessing unreliable on Render containers
+                    )
+            else:
+                metrics = runner.run(
+                    num_spins=req.num_spins,
+                    output_csv=None,
+                    seed=None,
+                    workers=1,
+                )
 
             buckets = {}
             for k, v in metrics.items():
@@ -225,7 +239,8 @@ async def simulate(req: SimulateRequest, request: Request):
                 "avg_jackpot":     None,
                 "backend":         "python",
             }
-            _cache_set(key, result)
+            if key is not None:
+                _cache_set(key, result)
             loop.call_soon_threadsafe(future.set_result, result)
 
         except Exception as exc:
@@ -239,7 +254,7 @@ async def simulate(req: SimulateRequest, request: Request):
 @app.post("/api/tune")
 async def tune(req: TuneRequest, request: Request):
     _check_rate(_real_ip(request), "tune", 3)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     aq: asyncio.Queue = asyncio.Queue()
 
     def run_thread():
@@ -276,7 +291,8 @@ async def tune(req: TuneRequest, request: Request):
                     break
 
                 step = C / _math.pow(k, ALPHA)
-                x = max(0.3, min(20.0, x - step * err))
+                clipped_err = _math.copysign(min(abs(err), 0.5), err)
+                x = max(0.3, min(20.0, x - step * clipped_err))
 
             win   = x_history[-5:]
             best_w = sum(win) / len(win)
@@ -315,7 +331,7 @@ async def balance(req: BalanceRequest, request: Request):
     if not CMA_AVAILABLE:
         raise HTTPException(status_code=501, detail="cma not installed — pip install cma")
     _check_rate(_real_ip(request), "balance", 2)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     aq: asyncio.Queue = asyncio.Queue()
 
     def run_thread():

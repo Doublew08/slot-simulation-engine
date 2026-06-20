@@ -583,3 +583,84 @@ button, a, input, select {
     .orb-2 { width: 280px; height: 280px; }
     .orb-3 { width: 180px; height: 180px; }
 }
+
+/* Light theme overrides */
+.light-mode {
+  --bg-color: #fafafa;
+  --panel-bg: rgba(0, 0, 0, 0.05);
+  --panel-border: rgba(0, 0, 0, 0.1);
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --accent-glow: rgba(139, 92, 246, 0.3);
+  --primary-color: #6d28d9;
+  --primary-hover: #7c3aed;
+  --success-color: #10b981;
+  --wild-color: #f59e0b;
+  --scatter-color: #c084fc;
+  --coin-color: #fbbf24;
+}
+
+.light-mode body {
+  background-color: var(--bg-color);
+}
+
+.light-mode .background-orbs .orb {
+  opacity: 0.15;
+}
+
+.light-mode .slot-machine {
+  background: #e5e7eb;
+  border-color: #d1d5db;
+}
+
+.light-mode .slot-grid {
+  background: #f3f4f6;
+}
+
+.light-mode .slot-cell {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #111827;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+}
+
+.light-mode .metric-card {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+}
+
+.light-mode .editor-card {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.08);
+}
+
+.light-mode input {
+  background: #fff;
+  border-color: #d1d5db;
+  color: #111827;
+}
+
+.light-mode input:focus {
+  border-color: var(--primary-color);
+}
+
+.light-mode .btn-primary:disabled {
+  background: #9ca3af;
+}
+
+.light-mode .btn-cyber-small {
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.15);
+  color: #374151;
+}
+
+.light-mode .btn-secondary {
+  border-color: rgba(0,0,0,0.2);
+  color: #374151;
+}
+
+.light-mode header h1 {
+  background: linear-gradient(135deg, #1e1b4b, #6d28d9);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}

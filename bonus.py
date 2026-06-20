@@ -59,7 +59,7 @@ class BonusFeature:
                 spin_payout, _ = evaluator.evaluate(grid)
                 scatter_count, scatter_payout = evaluator.evaluate_scatters(grid)
 
-            total_payout += (spin_payout * self.multiplier) + scatter_payout
+            total_payout += (spin_payout + scatter_payout) * self.multiplier
 
             if self.check_trigger(scatter_count):
                 spins_remaining += self.num_free_spins

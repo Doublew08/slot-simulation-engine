@@ -11,6 +11,47 @@ const BASE_PAYS = {
     SC: { 3: 1.0,   4: 4.0,   5: 20.0 },
 };
 
+// High-performance Xoshiro128++ PRNG for Monte Carlo simulation
+// Standard Math.random() is inadequate for billions of spins due to short period and V8 implementation details.
+class Xoshiro128pp {
+    constructor(seed) {
+        let h = seed >>> 0;
+        if (h === 0) h = Date.now() >>> 0;
+        const hash = () => {
+            h = Math.imul(h ^ (h >>> 16), 2246822507);
+            h = Math.imul(h ^ (h >>> 13), 3266489909);
+            return (h ^= h >>> 16) >>> 0;
+        };
+        this.s = [hash(), hash(), hash(), hash()];
+        if (this.s[0] === 0 && this.s[1] === 0 && this.s[2] === 0 && this.s[3] === 0) {
+            this.s[0] = 1; // state must not be all zero
+        }
+    }
+
+    next() {
+        const s0 = this.s[0];
+        let s1 = this.s[1];
+        const s2 = this.s[2];
+        const s3 = this.s[3];
+
+        const rotl = (x, k) => (x << k) | (x >>> (32 - k));
+        const result = (rotl(s0 + s3, 7) + s0) >>> 0;
+
+        const t = s1 << 9;
+        this.s[2] ^= s0;
+        this.s[3] ^= s1;
+        this.s[1] ^= s2;
+        this.s[0] ^= s3;
+        this.s[2] ^= t;
+        this.s[3] = rotl(s3, 11);
+
+        return result / 4294967296.0;
+    }
+}
+
+// Global engine RNG
+const ENGINE_RNG = new Xoshiro128pp(Date.now() ^ (Math.random() * 0xFFFFFFFF));
+
 class SymbolDef {
     constructor(name, payouts, is_wild = false, is_scatter = false, is_coin = false) {
         this.name = name;
@@ -72,7 +113,7 @@ class Reel {
         let col = new Array(num_rows);
         const pool = this._pool, size = this._poolSize, syms = this.symbols;
         for (let i = 0; i < num_rows; i++) {
-            col[i] = syms[pool[Math.floor(Math.random() * size)]];
+            col[i] = syms[pool[Math.floor(ENGINE_RNG.next() * size)]];
         }
         return col;
     }
@@ -256,8 +297,8 @@ class Simulation {
     }
     
     _getRandomCoin() {
-        if (Math.random() < 0.0001) return {type: "Major", val: 450.0};
-        let choice = this.value_pool[Math.floor(Math.random() * this.value_pool.length)];
+        if (ENGINE_RNG.next() < 0.0001) return {type: "Major", val: 450.0};
+        let choice = this.value_pool[Math.floor(ENGINE_RNG.next() * this.value_pool.length)];
         if (choice === "Mini") return {type: "Mini", val: 9.0};
         if (choice === "Minor") return {type: "Minor", val: 45.0};
         return {type: "cash", val: parseFloat(choice)};
@@ -289,7 +330,7 @@ class Simulation {
         let num_cols = grid[0].length;
         
         // Determine Strength Level
-        let roll = Math.random();
+        let roll = ENGINE_RNG.next();
         let strength = "Weak";
         let prob_mult = 0.5;
         let upgrade_prob = 0.0;   // Weak: no upgrades
@@ -307,7 +348,7 @@ class Simulation {
         for (let r = 0; r < num_rows; r++) {
             let row_mask = [];
             for (let c = 0; c < num_cols; c++) {
-                if (grid[r][c] === "CO" || (is_bonus_buy && Math.random() < 0.4 && coin_count < 6)) {
+                if (grid[r][c] === "CO" || (is_bonus_buy && ENGINE_RNG.next() < 0.4 && coin_count < 6)) {
                     row_mask.push(this._getRandomCoin());
                     coin_count++;
                 } else {
@@ -346,13 +387,13 @@ class Simulation {
             for (let r = 0; r < num_rows; r++) {
                 for (let c = 0; c < num_cols; c++) {
                     if (mask[r][c] === null) {
-                        if (Math.random() < current_prob) {
+                        if (ENGINE_RNG.next() < current_prob) {
                             mask[r][c] = this._getRandomCoin();
                             new_coin = true;
                         }
                     } else {
                         // Upgrade mechanic
-                        if (Math.random() < upgrade_prob) {
+                        if (ENGINE_RNG.next() < upgrade_prob) {
                             let coin = mask[r][c];
                             if (coin.type === "cash") {
                                 coin.val *= 2.0; // Double cash

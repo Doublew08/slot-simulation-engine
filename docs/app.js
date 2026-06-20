@@ -75,11 +75,72 @@ document.addEventListener('DOMContentLoaded', () => {
             audioToggleBtn.style.borderColor = "var(--primary-color)";
         } else {
             audioToggleBtn.innerText = "🔇 SOUND OFF";
-            audioToggleBtn.style.color = "var(--secondary-color)";
-            audioToggleBtn.style.borderColor = "var(--secondary-color)";
+            audioToggleBtn.style.color = "var(--text-secondary)";
+            audioToggleBtn.style.borderColor = "var(--text-secondary)";
         }
     });
 
+    // --- DARK MODE TOGGLE ---
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const rootElement = document.documentElement;
+    // Load saved preference
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        rootElement.classList.add('light-mode');
+        darkModeToggle.innerText = '🌞 Light Mode';
+    } else {
+        // default dark mode (no extra class)
+        rootElement.classList.remove('light-mode');
+        darkModeToggle.innerText = '🌙 Dark Mode';
+    }
+    darkModeToggle.addEventListener('click', () => {
+        if (rootElement.classList.contains('light-mode')) {
+            rootElement.classList.remove('light-mode');
+            localStorage.setItem('theme', 'dark');
+            darkModeToggle.innerText = '🌙 Dark Mode';
+        } else {
+            rootElement.classList.add('light-mode');
+            localStorage.setItem('theme', 'light');
+            darkModeToggle.innerText = '🌞 Light Mode';
+        }
+    });
+
+    // --- FULLSCREEN TOGGLE ---
+    const fullscreenToggle = document.getElementById('fullscreenToggle');
+    fullscreenToggle.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => {
+                console.error(`Error attempting to enable fullscreen mode: ${err.message} (${err.name})`);
+            });
+            fullscreenToggle.innerText = '🖥️ Exit Fullscreen';
+        } else {
+            document.exitFullscreen();
+            fullscreenToggle.innerText = '🖥️ Fullscreen';
+        }
+    });
+
+    // Sync fullscreen button text when user exits via Escape key
+    document.addEventListener('fullscreenchange', () => {
+        if (!document.fullscreenElement) {
+            fullscreenToggle.innerText = '🖥️ Fullscreen';
+        } else {
+            fullscreenToggle.innerText = '🖥️ Exit Fullscreen';
+        }
+    });
+
+    // Stop auto-spin when tab becomes hidden to prevent memory buildup
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden && autoSpinInterval) {
+            clearInterval(autoSpinInterval);
+            autoSpinInterval = null;
+            const autoBtn = document.getElementById('autoSpinBtn');
+            if (autoBtn) {
+                autoBtn.classList.remove('active');
+                autoBtn.innerText = 'AUTO';
+            }
+        }
+    });
+    
     // --- BACKEND TOGGLE ---
     // --- REEL EDITOR & PRESETS LOGIC ---
     const editorGrid = document.getElementById('editorGrid');
@@ -222,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const v = cfg.weights[sym];
                     if (Number.isFinite(v) && v >= 0) safe[sym] = v;
                 }
-                if (Object.keys(safe).length > 0) renderEditor(safe);
+                if (Object.keys(safe).length > 0) renderEditor({...presets.med, ...safe});
             }
             // payScale from the auto-balancer: scale all paytable values proportionally
             if (Number.isFinite(cfg.payScale) && cfg.payScale > 0) {
@@ -246,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.body.appendChild(toast);
                 setTimeout(() => toast.remove(), 4000);
             }
-        } catch (_) {}
+        } catch (err) { console.warn('Failed to load config from URL:', err); }
     }
 
     loadConfigFromUrl();
@@ -332,8 +393,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     runBtn.addEventListener('click', async () => {
-        const numSpins = parseInt(document.getElementById('numSpins').value) || 1000000;
-        const coinProb = parseFloat(document.getElementById('coinProb').value) || 0.05;
+        const rawSpins = parseInt(document.getElementById('numSpins').value);
+        const numSpins = Number.isFinite(rawSpins) ? Math.max(1000, Math.min(50000000, rawSpins)) : 1000000;
+        const rawCoinProb = parseFloat(document.getElementById('coinProb').value);
+        const coinProb = Number.isFinite(rawCoinProb) ? Math.max(0, Math.min(1, rawCoinProb)) : 0.05;
         const bonusBuyMode = document.getElementById('bonusBuyMode').checked;
         const weights = getCustomWeights();
 
@@ -349,32 +412,6 @@ document.addEventListener('DOMContentLoaded', () => {
         // Keep currentSim on main thread for visual spin / documentation
         currentSim = new Simulation();
         currentSim.setupGame(weights, coinProb);
-        // Apply pay scale from auto-balancer if present
-        if (window._balancerPayScale && window._balancerPayScale !== 1.0) {
-            const ps = window._balancerPayScale;
-            const BASE_PAYS = {
-                W:  { 3: 0.22,  4: 0.88,  5: 3.50 },
-                H1: { 3: 0.18,  4: 0.66,  5: 1.75 },
-                H2: { 3: 0.13,  4: 0.44,  5: 1.30 },
-                M1: { 3: 0.09,  4: 0.35,  5: 0.88 },
-                M2: { 3: 0.09,  4: 0.26,  5: 0.70 },
-                L1: { 3: 0.044, 4: 0.18,  5: 0.44 },
-                L2: { 3: 0.044, 4: 0.13,  5: 0.35 },
-                SC: { 3: 1.0,   4: 4.0,   5: 20.0 },
-            };
-            const scaledDefs = [
-                new SymbolDef("W",  { 3: BASE_PAYS.W[3]  * ps, 4: BASE_PAYS.W[4]  * ps, 5: BASE_PAYS.W[5]  * ps }, true),
-                new SymbolDef("H1", { 3: BASE_PAYS.H1[3] * ps, 4: BASE_PAYS.H1[4] * ps, 5: BASE_PAYS.H1[5] * ps }),
-                new SymbolDef("H2", { 3: BASE_PAYS.H2[3] * ps, 4: BASE_PAYS.H2[4] * ps, 5: BASE_PAYS.H2[5] * ps }),
-                new SymbolDef("M1", { 3: BASE_PAYS.M1[3] * ps, 4: BASE_PAYS.M1[4] * ps, 5: BASE_PAYS.M1[5] * ps }),
-                new SymbolDef("M2", { 3: BASE_PAYS.M2[3] * ps, 4: BASE_PAYS.M2[4] * ps, 5: BASE_PAYS.M2[5] * ps }),
-                new SymbolDef("L1", { 3: BASE_PAYS.L1[3] * ps, 4: BASE_PAYS.L1[4] * ps, 5: BASE_PAYS.L1[5] * ps }),
-                new SymbolDef("L2", { 3: BASE_PAYS.L2[3] * ps, 4: BASE_PAYS.L2[4] * ps, 5: BASE_PAYS.L2[5] * ps }),
-                new SymbolDef("SC", { 3: BASE_PAYS.SC[3] * ps, 4: BASE_PAYS.SC[4] * ps, 5: BASE_PAYS.SC[5] * ps }, false, true),
-                new SymbolDef("CO", {}, false, false, true)
-            ];
-            currentSim.paytable = new Paytable(scaledDefs);
-        }
         updateDocumentation();
 
         lastResults = await runSimulation(numSpins, coinProb, weights, bonusBuyMode, (percent) => {
@@ -434,7 +471,8 @@ document.addEventListener('DOMContentLoaded', () => {
             "paytable": {}
         };
         
-        for (let [sym, def] of currentSim.paytable.entries()) {
+        for (let sym in currentSim.paytable._symbols) {
+            let def = currentSim.paytable._symbols[sym];
             parData.paytable[sym] = {
                 "payouts": def.payouts,
                 "is_wild": def.is_wild,
@@ -499,6 +537,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             let cascade_res = currentSim.run_cascade_spin();
                             
                             let totalWin = (cascade_res.payout + cascade_res.scatter_payout) * betSize;
+                            if (cascade_res.scatters >= currentSim.bonus_trigger_count) {
+                                totalWin += currentSim.run_free_spins() * betSize;
+                            }
                             if (cascade_res.hs_triggered) totalWin += cascade_res.hs_payout * betSize;
                             bal += totalWin;
                         }

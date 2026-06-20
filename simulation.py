@@ -1,7 +1,7 @@
 import csv
 import math
 import multiprocessing
-import random
+import random, secrets
 from typing import Dict, List, Optional
 
 from reels import ReelEngine
@@ -105,18 +105,20 @@ class SimulationRunner:
                 for coord in win["coords"]:
                     winning_coords.add(coord)
 
-            # Group by column, sort rows descending (remove bottom-first)
+            # Group by column
             cols_to_remove: dict = {}
             for row, col in winning_coords:
                 cols_to_remove.setdefault(col, []).append(row)
 
-            for col, rows in cols_to_remove.items():
-                for row in sorted(rows, reverse=True):
-                    # Shift everything above this row down by one
-                    for i in range(row, 0, -1):
-                        grid[i][col] = grid[i - 1][col]
-                    # Fill the vacated top cell with a fresh symbol
-                    grid[0][col] = reels[col].spin_one()
+            num_rows = self.reel_engine.num_rows
+            for col, rows_to_remove in cols_to_remove.items():
+                remove_set = set(rows_to_remove)
+                surviving = [grid[r][col] for r in range(num_rows) if r not in remove_set]
+                num_new = num_rows - len(surviving)
+                new_syms = [reels[col].spin_one() for _ in range(num_new)]
+                new_col = new_syms + surviving
+                for r in range(num_rows):
+                    grid[r][col] = new_col[r]
 
         return total_payout, sc_count, sc_pay
 
@@ -277,8 +279,8 @@ class SimulationRunner:
         # Deterministic per-worker seeds; None → OS entropy per worker
         seeds = [seed + i if seed is not None else None for i in range(workers)]
 
-        print(f"  Workers: {workers} | chunks: {chunks[0]}×{workers - remainder}"
-              + (f" + {chunks[0]+1}×{remainder}" if remainder else ""))
+        print(f"  Workers: {workers} | chunks: {chunk}×{workers - remainder}"
+              + (f" + {chunk+1}×{remainder}" if remainder else ""))
 
         args = list(zip([self] * workers, chunks, seeds))
         with multiprocessing.Pool(processes=workers) as pool:
@@ -348,7 +350,7 @@ class SimulationRunner:
         ht = b["hs_triggers"]
         gj = b["grand_jackpots"]
 
-        variance   = b["welf_M2"] / b["welf_n"] if b["welf_n"] > 1 else 0.0
+        variance   = b["welf_M2"] / (b["welf_n"] - 1) if b["welf_n"] > 1 else 0.0
         volatility = math.sqrt(variance) / bet if variance > 0 else 0.0
         ci_95      = 1.96 * volatility / math.sqrt(num_spins) if volatility > 0 else 0.0
 
@@ -397,5 +399,7 @@ class SimulationRunner:
             writer = csv.writer(f)
             writer.writerow(["Metric", "Value"])
             for k, v in metrics.items():
+                if isinstance(v, list):
+                    continue
                 writer.writerow([k, v])
         print(f"\nResults exported to {filename}")
