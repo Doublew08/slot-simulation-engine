@@ -20,6 +20,10 @@ pip install -r requirements.txt
 # Run the web UI (via FastAPI)
 uvicorn server:app --reload
 # Open http://localhost:8000 in your browser
+
+# Generate Exact Mathematical PAR Sheet
+python analytical.py
+# This iterates all 59,049 base combinations and outputs 'par_sheet.csv'
 ```
 
 ## 📚 Features
