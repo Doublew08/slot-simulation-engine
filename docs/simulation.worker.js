@@ -2,16 +2,7 @@
 // importScripts loads engine.js into the worker scope.
 importScripts('engine.js');
 
-const BASE_PAYS = {
-    W:  { 3: 0.22,  4: 0.88,  5: 3.50 },
-    H1: { 3: 0.18,  4: 0.66,  5: 1.75 },
-    H2: { 3: 0.13,  4: 0.44,  5: 1.30 },
-    M1: { 3: 0.09,  4: 0.35,  5: 0.88 },
-    M2: { 3: 0.09,  4: 0.26,  5: 0.70 },
-    L1: { 3: 0.044, 4: 0.18,  5: 0.44 },
-    L2: { 3: 0.044, 4: 0.13,  5: 0.35 },
-    SC: { 3: 1.0,   4: 4.0,   5: 20.0 },
-};
+
 
 function applyPayScale(sim, ps) {
     const scaledDefs = [

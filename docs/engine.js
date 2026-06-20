@@ -1,5 +1,16 @@
 // Paytable and Evaluation logic ported to JS
 
+const BASE_PAYS = {
+    W:  { 3: 0.22,  4: 0.88,  5: 3.50 },
+    H1: { 3: 0.18,  4: 0.66,  5: 1.75 },
+    H2: { 3: 0.13,  4: 0.44,  5: 1.30 },
+    M1: { 3: 0.09,  4: 0.35,  5: 0.88 },
+    M2: { 3: 0.09,  4: 0.26,  5: 0.70 },
+    L1: { 3: 0.044, 4: 0.18,  5: 0.44 },
+    L2: { 3: 0.044, 4: 0.13,  5: 0.35 },
+    SC: { 3: 1.0,   4: 4.0,   5: 20.0 },
+};
+
 class SymbolDef {
     constructor(name, payouts, is_wild = false, is_scatter = false, is_coin = false) {
         this.name = name;
@@ -189,14 +200,14 @@ class Simulation {
     
     setupGame(customWeights, coinProbability) {
         let symbols = [
-            new SymbolDef("W",  {3: 0.22,  4: 0.88,  5: 3.50}, true),
-            new SymbolDef("H1", {3: 0.18,  4: 0.66,  5: 1.75}),
-            new SymbolDef("H2", {3: 0.13,  4: 0.44,  5: 1.30}),
-            new SymbolDef("M1", {3: 0.09,  4: 0.35,  5: 0.88}),
-            new SymbolDef("M2", {3: 0.09,  4: 0.26,  5: 0.70}),
-            new SymbolDef("L1", {3: 0.044, 4: 0.18,  5: 0.44}),
-            new SymbolDef("L2", {3: 0.044, 4: 0.13,  5: 0.35}),
-            new SymbolDef("SC", {3: 1.0,   4: 4.0,   5: 20.0}, false, true),
+            new SymbolDef("W",  BASE_PAYS.W, true),
+            new SymbolDef("H1", BASE_PAYS.H1),
+            new SymbolDef("H2", BASE_PAYS.H2),
+            new SymbolDef("M1", BASE_PAYS.M1),
+            new SymbolDef("M2", BASE_PAYS.M2),
+            new SymbolDef("L1", BASE_PAYS.L1),
+            new SymbolDef("L2", BASE_PAYS.L2),
+            new SymbolDef("SC", BASE_PAYS.SC, false, true),
             new SymbolDef("CO", {}, false, false, true)
         ];
         this.paytable = new Paytable(symbols);
@@ -454,6 +465,8 @@ class Simulation {
             hs_triggered: hs_res.triggered,
             hs_payout: hs_res.payout,
             hs_grand: hs_res.grand,
+            strength: hs_res.strength,
+            upgrades: hs_res.upgrades,
             final_grid: grid
         };
     }

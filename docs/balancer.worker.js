@@ -10,18 +10,7 @@ importScripts('engine.js');
 
 const DEFAULT_WEIGHTS = { W: 1, H1: 2, H2: 2, M1: 3, M2: 3, L1: 30, L2: 35, SC: 1, CO: 2 };
 
-// BASE_PAYS: canonical payout multipliers at full (1.0) pay scale.
-// Tuner scales these proportionally so any target RTP is reachable.
-const BASE_PAYS = {
-    W:  { 3: 0.22,  4: 0.88,  5: 3.50 },
-    H1: { 3: 0.18,  4: 0.66,  5: 1.75 },
-    H2: { 3: 0.13,  4: 0.44,  5: 1.30 },
-    M1: { 3: 0.09,  4: 0.35,  5: 0.88 },
-    M2: { 3: 0.09,  4: 0.26,  5: 0.70 },
-    L1: { 3: 0.044, 4: 0.18,  5: 0.44 },
-    L2: { 3: 0.044, 4: 0.13,  5: 0.35 },
-    SC: { 3: 1.0,   4: 4.0,   5: 20.0 },
-};
+
 
 function scaledSymbolDefs(payScale) {
     return [
