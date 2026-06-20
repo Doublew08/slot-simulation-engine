@@ -1,0 +1,1 @@
+const fs = require('fs'); const code = fs.readFileSync('docs/engine.js', 'utf8'); eval(code); let sim = new Simulation(); let results = sim.runSimulationSync(1000000, ()=>{}, false); console.log(results.base_rtp, results.total_rtp);

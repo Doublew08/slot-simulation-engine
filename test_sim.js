@@ -1,0 +1,1 @@
+const fs = require('fs'); eval(fs.readFileSync('docs/engine.js', 'utf8')); let sim = new Simulation(); sim.setupGame({0:[['W',1],['H1',2],['M1',3]], 1:[['W',1],['H1',2],['M1',3]], 2:[['W',1],['H1',2],['M1',3]], 3:[['W',1],['H1',2],['M1',3]], 4:[['W',1],['H1',2],['M1',3]]}, 0.05); let results = sim.run_session(100000); console.log(results);

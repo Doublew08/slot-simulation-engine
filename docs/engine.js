@@ -1,14 +1,14 @@
 // Paytable and Evaluation logic ported to JS
 
 const BASE_PAYS = {
-    W:  { 3: 0.22,  4: 0.88,  5: 3.50 },
-    H1: { 3: 0.18,  4: 0.66,  5: 1.75 },
-    H2: { 3: 0.13,  4: 0.44,  5: 1.30 },
-    M1: { 3: 0.09,  4: 0.35,  5: 0.88 },
-    M2: { 3: 0.09,  4: 0.26,  5: 0.70 },
-    L1: { 3: 0.044, 4: 0.18,  5: 0.44 },
-    L2: { 3: 0.044, 4: 0.13,  5: 0.35 },
-    SC: { 3: 1.0,   4: 4.0,   5: 20.0 },
+    W:  { 3: 0.5, 4: 2.0, 5: 10.0 },
+    H1: { 3: 0.4, 4: 1.5, 5:  5.0 },
+    H2: { 3: 0.3, 4: 1.0, 5:  4.0 },
+    M1: { 3: 0.2, 4: 0.8, 5:  2.5 },
+    M2: { 3: 0.2, 4: 0.6, 5:  2.0 },
+    L1: { 3: 0.1, 4: 0.4, 5:  1.5 },
+    L2: { 3: 0.1, 4: 0.3, 5:  1.0 },
+    SC: { 3: 2.0, 4: 10.0, 5: 50.0 },
 };
 
 // High-performance Xoshiro128++ PRNG for Monte Carlo simulation
@@ -146,7 +146,7 @@ class Evaluator {
         this.paylines = paylines;
     }
 
-    evaluate_scatters(grid) {
+    evaluate_scatters(grid, bet_amount = 1.0) {
         let scatter_name = this.paytable.scatter_name;
         if (!scatter_name) return {count: 0, payout: 0};
         
@@ -156,18 +156,17 @@ class Evaluator {
                 if (grid[r][c] === scatter_name) count++;
             }
         }
-        return {count: count, payout: this.paytable.payout(scatter_name, count)};
+        return {count: count, payout: this.paytable.payout(scatter_name, count) * bet_amount};
     }
 
-    evaluate(grid) {
-        let total_payout = 0.0;
-        let num_cols = grid[0].length;
+    evaluate(grid, bet_amount = 1.0) {
+        let total_payout = 0;
         let winning_coords = new Set();
+        let num_cols = grid[0].length;
         
-        for (let line_idx = 0; line_idx < this.paylines.length; line_idx++) {
-            let line = this.paylines[line_idx];
+        for (let line of this.paylines) {
             let symbols_on_line = [];
-            for (let c = 0; c < line.length; c++) {
+            for (let c = 0; c < num_cols; c++) {
                 symbols_on_line.push(grid[line[c]][c]);
             }
             
@@ -225,7 +224,8 @@ class Evaluator {
         }
         
         let coords_array = Array.from(winning_coords).map(str => str.split(',').map(Number));
-        return { payout: total_payout, coords: coords_array };
+        let scaled_payout = total_payout * bet_amount;
+        return { payout: scaled_payout, coords: coords_array };
     }
 }
 
@@ -234,7 +234,7 @@ class Simulation {
         this.bet_amount = 1.0;
         // Default weights
         this.defaultWeights = {
-            "W": 1, "H1": 2, "H2": 2, "M1": 3, "M2": 3, "L1": 30, "L2": 35, "SC": 1, "CO": 2
+            "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3
         };
         this.setupGame(this.defaultWeights, 0.05);
     }
@@ -430,7 +430,7 @@ class Simulation {
         let total_value = 0.0;
         for (let r=0; r<num_rows; r++) {
             for (let c=0; c<num_cols; c++) {
-                if (mask[r][c] !== null) total_value += mask[r][c].val;
+                if (mask[r][c] !== null) total_value += mask[r][c].val * this.bet_amount;
             }
         }
         if (hit_grand) {
@@ -451,7 +451,7 @@ class Simulation {
         let grid = this.engine.spin();
         let total_spin_payout = 0.0;
 
-        let initial_scatters = this.evaluator.evaluate_scatters(grid);
+        let initial_scatters = this.evaluator.evaluate_scatters(grid, this.bet_amount);
         let scatter_payout = initial_scatters.payout;
         let scatter_count = initial_scatters.count;
 
@@ -459,7 +459,7 @@ class Simulation {
         let cascades = 0;
 
         while(keep_cascading && cascades < 15) {
-            let eval_res = this.evaluator.evaluate(grid);
+            let eval_res = this.evaluator.evaluate(grid, this.bet_amount);
             if (eval_res.payout > 0) {
                 total_spin_payout += eval_res.payout;
                 let coords = eval_res.coords;

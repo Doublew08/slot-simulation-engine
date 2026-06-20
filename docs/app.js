@@ -162,9 +162,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- REEL EDITOR & PRESETS LOGIC ---
     const editorGrid = document.getElementById('editorGrid');
     const presets = {
-        low: { "W": 2, "H1": 3, "H2": 4, "M1": 5, "M2": 6, "L1": 25, "L2": 30, "SC": 1.5, "CO": 3 },
-        med: { "W": 1, "H1": 2, "H2": 2, "M1": 3, "M2": 3, "L1": 30, "L2": 35, "SC": 1, "CO": 2 },
-        high: { "W": 0.5, "H1": 1, "H2": 1, "M1": 2, "M2": 2, "L1": 40, "L2": 45, "SC": 0.5, "CO": 1 }
+        low: { "W": 6.0, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
+        med: { "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
+        high: { "W": 2.0, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 }
     };
     
     function renderEditor(weights) {
@@ -696,7 +696,7 @@ document.addEventListener('DOMContentLoaded', () => {
         columns.forEach((col, idx) => {
             setTimeout(() => {
                 clearInterval(shuffleIntervals[col]);
-                playCoinSound(); // Small tick sound for reel stop
+                playTone(400, 'square', 0.05, 0.05); // Small tick sound for reel stop
                 for (let r = 0; r < 3; r++) {
                     let sym = finalGrid[r][col];
                     let flatIndex = r * 5 + col;
@@ -744,6 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
             playTone(400, 'sine', 0.1, 0.05);
         }
         
+        let isBigWin = total >= (currentSim ? currentSim.bet_amount * 10 : 10.0);
         if (isBigWin || total > 0) {
             winDisplay.style.color = 'var(--success-color)';
             winDisplay.style.textShadow = '0 0 20px rgba(0, 230, 118, 0.6)';
