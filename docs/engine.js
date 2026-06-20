@@ -29,21 +29,16 @@ class Xoshiro128pp {
     }
 
     next() {
-        const s0 = this.s[0];
-        let s1 = this.s[1];
-        const s2 = this.s[2];
-        const s3 = this.s[3];
-
         const rotl = (x, k) => (x << k) | (x >>> (32 - k));
-        const result = (rotl(s0 + s3, 7) + s0) >>> 0;
+        const result = (rotl(this.s[0] + this.s[3], 7) + this.s[0]) >>> 0;
 
-        const t = s1 << 9;
-        this.s[2] ^= s0;
-        this.s[3] ^= s1;
-        this.s[1] ^= s2;
-        this.s[0] ^= s3;
+        const t = this.s[1] << 9;
+        this.s[2] ^= this.s[0];
+        this.s[3] ^= this.s[1];
+        this.s[1] ^= this.s[2];
+        this.s[0] ^= this.s[3];
         this.s[2] ^= t;
-        this.s[3] = rotl(s3, 11);
+        this.s[3] = rotl(this.s[3], 11);
 
         return result / 4294967296.0;
     }
@@ -234,7 +229,7 @@ class Simulation {
         this.bet_amount = 1.0;
         // Default weights
         this.defaultWeights = {
-            "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3
+            "W": 2.61, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3
         };
         this.setupGame(this.defaultWeights, 0.05);
     }
@@ -457,9 +452,19 @@ class Simulation {
 
         let keep_cascading = true;
         let cascades = 0;
+        
+        let history = [];
 
         while(keep_cascading && cascades < 15) {
+            let current_grid_copy = grid.map(r => [...r]);
             let eval_res = this.evaluator.evaluate(grid, this.bet_amount);
+            
+            history.push({
+                grid: current_grid_copy,
+                payout: eval_res.payout,
+                coords: eval_res.coords
+            });
+
             if (eval_res.payout > 0) {
                 total_spin_payout += eval_res.payout;
                 let coords = eval_res.coords;
@@ -472,12 +477,18 @@ class Simulation {
 
                 for (let c=0; c<5; c++) {
                     if (cols_to_remove[c].length > 0) {
-                        cols_to_remove[c].sort((a,b) => b-a);
-                        for (let r of cols_to_remove[c]) {
-                            for(let i=r; i>0; i--) {
-                                grid[i][c] = grid[i-1][c];
+                        let remove_set = new Set(cols_to_remove[c]);
+                        let surviving = [];
+                        for (let r=0; r<this.engine.num_rows; r++) {
+                            if (!remove_set.has(r)) {
+                                surviving.push(grid[r][c]);
                             }
-                            grid[0][c] = this.engine.reels[c].spin_column(1)[0];
+                        }
+                        let num_new = this.engine.num_rows - surviving.length;
+                        let new_syms = this.engine.reels[c].spin_column(num_new);
+                        let new_col = new_syms.concat(surviving);
+                        for (let r=0; r<this.engine.num_rows; r++) {
+                            grid[r][c] = new_col[r];
                         }
                     }
                 }
@@ -508,7 +519,8 @@ class Simulation {
             hs_grand: hs_res.grand,
             strength: hs_res.strength,
             upgrades: hs_res.upgrades,
-            final_grid: grid
+            final_grid: grid,
+            history: history
         };
     }
     

@@ -373,17 +373,17 @@
                     <div style="display:flex;flex-direction:column;gap:0.75rem;">
                         <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
                             <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">RTP (Return to Player)</div>
-                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">total_win ÷ total_wagered</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:0.3rem;">\(\text{RTP} = \frac{\sum \text{total\_win}}{\sum \text{total\_wagered}}\)</div>
                             <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Decomposed into Base + Bonus + H&amp;S. Target ≈ 95% — house edge = 5%.</div>
                         </div>
                         <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
                             <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">Volatility Index</div>
-                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">√(variance) ÷ bet</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:0.3rem;">\(\text{Volatility} = \frac{\sqrt{\text{Var}(\text{win})}}{\text{bet}}\)</div>
                             <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Variance computed via Welford's online algorithm — numerically stable at 10M+ spins.</div>
                         </div>
                         <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
                             <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">Hit Rate</div>
-                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">spins_with_payout &gt; 0 ÷ total_spins</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:0.3rem;">\(\text{Hit Rate} = \frac{\text{Spins}_{\text{win} > 0}}{\text{Total Spins}} \times 100\%\)</div>
                             <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Elevated by cascades — a single bet can count as a hit across multiple cascade levels.</div>
                         </div>
                         <div style="border-bottom:1px solid rgba(255,255,255,0.07);padding-bottom:0.75rem;">
@@ -393,7 +393,7 @@
                         </div>
                         <div>
                             <div style="color:var(--primary-color);font-weight:600;font-size:0.9rem;margin-bottom:0.25rem;">Trigger Frequency</div>
-                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.8rem;margin-bottom:0.3rem;">total_spins ÷ trigger_count</div>
+                            <div style="font-family:'Space Grotesk',sans-serif;color:rgba(255,255,255,0.5);font-size:0.9rem;margin-bottom:0.3rem;">\(f_{\text{trigger}} = \frac{1}{\left( \frac{\text{Total Spins}}{\text{Triggers}} \right)}\)</div>
                             <div style="color:var(--text-secondary);font-size:0.84rem;line-height:1.5;">Reported as "1 in X" for Free Spins, H&amp;S, and Grand Jackpot separately.</div>
                         </div>
                     </div>

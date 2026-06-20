@@ -31,7 +31,7 @@ PAYLINES = [
 ]
 
 
-def build_game(wild_weight: float = 4.238) -> SimulationRunner:
+def build_game(wild_weight: float = 2.61) -> SimulationRunner:
     """
     Construct the full game model and return a ready-to-run SimulationRunner.
 

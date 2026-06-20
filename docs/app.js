@@ -170,9 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- REEL EDITOR & PRESETS LOGIC ---
     const editorGrid = document.getElementById('editorGrid');
     const presets = {
-        low: { "W": 6.0, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
-        med: { "W": 4.238, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
-        high: { "W": 2.0, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 }
+        low: { "W": 4.0, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
+        med: { "W": 2.61, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 },
+        high: { "W": 1.5, "H1": 4, "H2": 5, "M1": 6, "M2": 7, "L1": 10, "L2": 12, "SC": 2, "CO": 3 }
     };
     
     function renderEditor(weights) {
@@ -673,13 +673,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Generate the outcome
         let cascade_res = currentSim.run_cascade_spin();
-        let finalGrid = cascade_res.final_grid;
+        
+        // Start animation with the initial grid
+        let initialGrid = cascade_res.history.length > 0 ? cascade_res.history[0].grid : cascade_res.final_grid;
         
         slotCells.forEach(cell => {
-            cell.classList.remove('win-pulse');
+            cell.classList.remove('win-pulse', 'sym-fade');
             cell.classList.add('spinning');
         });
         winDisplay.innerText = "SPINNING...";
+        winDisplay.style.color = 'var(--text-secondary)';
+        winDisplay.style.textShadow = 'none';
         
         const allSymbols = ["W", "H1", "H2", "M1", "M2", "L1", "L2", "SC", "CO"];
         
@@ -689,7 +693,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         columns.forEach(col => {
             let interval = setInterval(() => {
-                // Update the 3 cells in this column with random symbols
                 for (let r = 0; r < 3; r++) {
                     let randSym = allSymbols[Math.floor(Math.random() * allSymbols.length)];
                     let flatIndex = r * 5 + col;
@@ -706,45 +709,107 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearInterval(shuffleIntervals[col]);
                 playTone(400, 'square', 0.05, 0.05); // Small tick sound for reel stop
                 for (let r = 0; r < 3; r++) {
-                    let sym = finalGrid[r][col];
+                    let sym = initialGrid[r][col];
                     let flatIndex = r * 5 + col;
                     slotCells[flatIndex].innerHTML = `<img src="assets/${sym}.webp" class="symbol-img" alt="${sym}">`;
                     slotCells[flatIndex].className = `slot-cell sym-${sym}`;
                     
-                    // Add landing animation
                     let img = slotCells[flatIndex].querySelector('.symbol-img');
-                    img.style.animation = "land 0.3s ease-out";
+                    if(img) img.style.animation = "land 0.3s ease-out";
                 }
                 
-                // If it's the last reel, evaluate wins
+                // If it's the last reel, start the cascade sequence
                 if (idx === 4) {
-                    isSpinning = false;
-                    evaluateVisualWin(cascade_res);
+                    playCascadeSequence(cascade_res);
                 }
             }, 500 + (idx * 300)); // 500ms, 800ms, 1100ms, 1400ms, 1700ms
         });
     }
     
-    function evaluateVisualWin(cascade_res) {
+    async function playCascadeSequence(cascade_res) {
+        let cumulative_win = 0.0;
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+        
+        // Play out each cascade step
+        for (let step = 0; step < cascade_res.history.length; step++) {
+            let state = cascade_res.history[step];
+            
+            // Render current grid (skip for step 0 as it's already rendered)
+            if (step > 0) {
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        let sym = state.grid[r][c];
+                        let flatIndex = r * 5 + c;
+                        slotCells[flatIndex].innerHTML = `<img src="assets/${sym}.webp" class="symbol-img" alt="${sym}">`;
+                        slotCells[flatIndex].className = `slot-cell sym-${sym}`;
+                    }
+                }
+                await sleep(400); // Wait for drop animation
+            }
+            
+            // If there's a win in this step, highlight it
+            if (state.payout > 0) {
+                cumulative_win += state.payout;
+                winDisplay.innerText = `WIN: ${cumulative_win.toFixed(2)}`;
+                winDisplay.style.color = 'var(--success-color)';
+                winDisplay.style.textShadow = '0 0 20px rgba(0, 230, 118, 0.6)';
+                playWinSound();
+                
+                // Highlight winning symbols
+                let coords_set = new Set(state.coords.map(c => `${c[0]},${c[1]}`));
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (coords_set.has(`${r},${c}`)) {
+                            let flatIndex = r * 5 + c;
+                            slotCells[flatIndex].classList.add('win-pulse');
+                        }
+                    }
+                }
+                
+                await sleep(1200); // Hold highlight
+                
+                // Fade out winning symbols
+                for (let r = 0; r < 3; r++) {
+                    for (let c = 0; c < 5; c++) {
+                        if (coords_set.has(`${r},${c}`)) {
+                            let flatIndex = r * 5 + c;
+                            slotCells[flatIndex].classList.remove('win-pulse');
+                            slotCells[flatIndex].innerHTML = ''; // Empty cell
+                        }
+                    }
+                }
+                await sleep(400); // Wait for symbols to disappear
+            }
+        }
+        
+        // Final evaluation (Scatters, H&S)
         let total = cascade_res.payout + cascade_res.scatter_payout;
         let text = `WIN: ${total.toFixed(2)}`;
         
-        if (total > 0) playWinSound();
-        
         if (cascade_res.scatters >= 3) {
             text += ` | FREE SPINS!`;
-            slotCells.forEach(cell => { 
-                if(cell.querySelector('img') && cell.querySelector('img').alt === 'SC') 
-                    cell.classList.add('win-pulse'); 
-            });
+            playWinSound();
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 5; c++) {
+                    if (cascade_res.final_grid[r][c] === 'SC') {
+                        slotCells[r * 5 + c].classList.add('win-pulse');
+                    }
+                }
+            }
         }
+        
         if (cascade_res.hs_triggered) {
             text += ` | HOLD & SPIN: ${cascade_res.hs_payout.toFixed(2)}`;
-            slotCells.forEach(cell => { 
-                if(cell.querySelector('img') && cell.querySelector('img').alt === 'CO') 
-                    cell.classList.add('win-pulse'); 
-            });
+            playWinSound();
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 5; c++) {
+                    if (cascade_res.final_grid[r][c] === 'CO') {
+                        slotCells[r * 5 + c].classList.add('win-pulse');
+                    }
+                }
+            }
         }
+        
         if (cascade_res.hs_grand) {
             text = `💰 PROGRESSIVE JACKPOT HIT! 💰`;
             playJackpotSound();
@@ -759,10 +824,11 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             winDisplay.style.color = 'var(--text-secondary)';
             winDisplay.style.textShadow = 'none';
-            text = "SYSTEM READY";
+            text = "NO WIN";
         }
         
         winDisplay.innerText = text;
+        isSpinning = false;
     }
 
     spinOnceBtn.addEventListener('click', () => {
